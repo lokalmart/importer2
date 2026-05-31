@@ -1,0 +1,17 @@
+{
+  "name": "lokalmart-web3-odoo-importer",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Lokalmart Web3 XLSX multi-sheet importer for Odoo External API on Vercel",
+  "scripts": {
+    "dev": "vercel dev",
+    "start": "vercel dev"
+  },
+  "dependencies": {
+    "formidable": "^3.5.2",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "vercel": "^33.7.1"
+  }
+}
