@@ -3,6 +3,15 @@
   "functions": {
     "api/import-xlsx.js": {
       "maxDuration": 60
+    },
+    "api/scan-structure.js": {
+      "maxDuration": 60
+    },
+    "api/export-structure-xlsx.js": {
+      "maxDuration": 60
+    },
+    "api/test-connection.js": {
+      "maxDuration": 30
     }
   },
   "headers": [
