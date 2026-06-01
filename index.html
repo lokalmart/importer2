@@ -25,7 +25,29 @@
       <p class="small">Environment variable wajib: <code>ODOO_URL</code>, <code>ODOO_DB</code>, <code>ODOO_USERNAME</code>, <code>ODOO_API_KEY</code>.</p>
     </div>
   </section>
+<section class="card" style="margin-top:18px;">
+  <h2>Odoo Structure Scanner</h2>
+  <p>
+    Fitur ini membaca struktur asli database Odoo Anda melalui External API:
+    model tersedia, field aktual, field required, readonly, relation, selection,
+    custom field, dan external ID.
+  </p>
 
+  <label class="small" for="modelsInput">Model yang ingin dicek</label>
+  <textarea
+    id="modelsInput"
+    style="width:100%; min-height:120px; margin-top:8px; border-radius:16px; border:1px solid rgba(255,255,255,.12); background:#081027; color:#f4f7ff; padding:14px; font-family:monospace;"
+  >res.partner, product.template, product.product, product.category, stock.lot, stock.quant, stock.location, stock.picking, sale.order, sale.order.line, project.project, project.task, project.task.type, project.tags, project.milestone, pos.order, pos.order.line, account.analytic.line, account.move, account.move.line, account.journal, account.account, website.page</textarea>
+
+  <div class="row" style="margin-top:14px;">
+    <button class="btn secondary" id="scanStructureBtn">Scan Struktur Odoo</button>
+    <button class="btn secondary" id="exportStructureBtn">Download Struktur XLSX</button>
+  </div>
+
+  <p class="small" style="margin-top:10px;">
+    Gunakan hasil scan ini sebelum membuat file import baru agar tidak ada field yang salah.
+  </p>
+</section>
   <section class="card" style="margin-top:16px">
     <h2>Upload Workbook</h2>
     <div id="drop" class="drop">
@@ -59,6 +81,111 @@ function render(result){stats.classList.remove('hidden');logs.classList.remove('
 async function loadConfig(){try{const d=await api('/api/config-status');$('configText').innerHTML=d.ok?'Siap. Environment Odoo sudah lengkap.':'Belum lengkap: '+escapeHtml((d.missing||[]).join(', '));}catch(e){$('configText').textContent=e.message;}}
 async function run(dryRun){if(!selectedFile)return;const fd=new FormData();fd.append('file',selectedFile);fd.append('dryRun',dryRun?'true':'false');dryBtn.disabled=true;importBtn.disabled=true;logs.classList.remove('hidden');logs.innerHTML='<div class="log"><div class="level info">INFO</div><div class="sheet">SYSTEM</div><div>Memproses...</div></div>';try{render(await api('/api/import-xlsx',{method:'POST',body:fd}));}catch(e){render({summary:{error:1},logs:[{level:'error',sheet:'SYSTEM',message:e.message}]});}finally{dryBtn.disabled=false;importBtn.disabled=false;}}
 file.addEventListener('change',e=>setFile(e.target.files[0]));drop.addEventListener('dragover',e=>{e.preventDefault();drop.classList.add('drag')});drop.addEventListener('dragleave',()=>drop.classList.remove('drag'));drop.addEventListener('drop',e=>{e.preventDefault();drop.classList.remove('drag');setFile(e.dataTransfer.files[0])});dryBtn.addEventListener('click',()=>run(true));importBtn.addEventListener('click',()=>{if(confirm('Import Now akan menulis data ke Odoo. Lanjutkan?'))run(false)});$('checkBtn').addEventListener('click',async()=>{try{render(await api('/api/test-connection'))}catch(e){render({summary:{error:1},logs:[{level:'error',sheet:'AUTH',message:e.message}]})}});loadConfig();
-</script>
+function getModelsInput() {
+  const el = document.getElementById('modelsInput');
+  return el ? el.value.trim() : '';
+}
+
+function renderStructureScan(data) {
+  stats.style.display = 'grid';
+  logs.style.display = 'block';
+  logs.innerHTML = '';
+
+  const s = data.summary || {};
+  $('okCount').textContent = s.ok || 0;
+  $('warnCount').textContent = s.warn || 0;
+  $('errorCount').textContent = s.error || 0;
+  $('infoCount').textContent = s.info || 0;
+
+  const title = document.createElement('div');
+  title.className = 'log';
+  title.innerHTML =
+    '<div class="level info">INFO</div>' +
+    '<div class="sheet">STRUCTURE</div>' +
+    '<div>Scan selesai. Total model: ' + (data.results || []).length + '</div>';
+  logs.appendChild(title);
+
+  (data.results || []).forEach((r) => {
+    const div = document.createElement('div');
+    div.className = 'log';
+
+    if (!r.available) {
+      div.innerHTML =
+        '<div class="level warn">WARN</div>' +
+        '<div class="sheet">' + escapeHtml(r.model) + '</div>' +
+        '<div>Model tidak tersedia di database ini.</div>';
+      logs.appendChild(div);
+      return;
+    }
+
+    const summary = r.summary || {};
+    const required = (summary.required_fields || []).join(', ');
+    const relations = (summary.relation_fields || [])
+      .map((x) => x.name + ' → ' + x.relation)
+      .join(', ');
+
+    div.innerHTML =
+      '<div class="level ok">OK</div>' +
+      '<div class="sheet">' + escapeHtml(r.model) + '</div>' +
+      '<div>' +
+      'Fields: ' + escapeHtml(summary.total_fields || 0) +
+      ' | Custom: ' + escapeHtml(summary.total_custom_fields || 0) +
+      ' | External IDs: ' + escapeHtml(summary.total_external_ids || 0) +
+      '<br><span class="small">Required: ' + escapeHtml(required || '-') + '</span>' +
+      '<br><span class="small">Relations: ' + escapeHtml(relations || '-') + '</span>' +
+      '</div>';
+
+    logs.appendChild(div);
+  });
+
+  (data.logs || []).forEach((l) => {
+    const div = document.createElement('div');
+    div.className = 'log';
+    div.innerHTML =
+      '<div class="level ' + l.level + '">' + l.level + '</div>' +
+      '<div class="sheet">' + escapeHtml(l.sheet || '') + '</div>' +
+      '<div>' + escapeHtml(l.message || '') + '</div>';
+    logs.appendChild(div);
+  });
+}
+
+async function scanStructure() {
+  const models = getModelsInput();
+  logs.style.display = 'block';
+  logs.innerHTML =
+    '<div class="log"><div class="level info">INFO</div><div class="sheet">STRUCTURE</div><div>Memindai struktur Odoo...</div></div>';
+
+  try {
+    const data = await api('/api/scan-structure?models=' + encodeURIComponent(models));
+    renderStructureScan(data);
+  } catch (e) {
+    render({
+      summary: { error: 1 },
+      logs: [
+        {
+          level: 'error',
+          sheet: 'STRUCTURE',
+          message: e.message
+        }
+      ]
+    });
+  }
+}
+
+function downloadStructure() {
+  const models = getModelsInput();
+  const url = '/api/export-structure-xlsx?models=' + encodeURIComponent(models);
+  window.open(url, '_blank');
+}
+
+const scanStructureBtn = document.getElementById('scanStructureBtn');
+if (scanStructureBtn) {
+  scanStructureBtn.addEventListener('click', scanStructure);
+}
+
+const exportStructureBtn = document.getElementById('exportStructureBtn');
+if (exportStructureBtn) {
+  exportStructureBtn.addEventListener('click', downloadStructure);
+}</script>
 </body>
 </html>
