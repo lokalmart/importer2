@@ -1520,7 +1520,59 @@ class LokalmartImporter {
       });
     }
   }
+async processProjectBudgets() {
+  const sheet = '14_PROJECT_BUDGETS';
+  const rows = sheetRows(this.workbook, sheet);
 
+  if (!rows.length) {
+    this.log.info(sheet, 'Sheet kosong/tidak ada, dilewati.');
+    return;
+  }
+
+  if (!await this.modelExists('project.project')) {
+    this.log.warn(sheet, 'Model project.project tidak tersedia, dilewati.');
+    return;
+  }
+
+  for (const [i, row] of rows.entries()) {
+    await this.runRow(sheet, i + 2, row.name || row['project_id/id'], async () => {
+      const projectXmlId = row['project_id/id'] || row.project_external_id;
+
+      const projectId = await this.m2o(
+        projectXmlId,
+        'project.project',
+        sheet,
+        true
+      );
+
+      const values = compactObject({
+        x_lokal_budget_planned_revenue: toNumberOrNull(row.x_lokal_budget_planned_revenue),
+        x_lokal_budget_planned_cost: toNumberOrNull(row.x_lokal_budget_planned_cost),
+        x_lokal_budget_reserved_cost: toNumberOrNull(row.x_lokal_budget_reserved_cost),
+        x_lokal_budget_net_target: toNumberOrNull(row.x_lokal_budget_net_target),
+        x_lokal_budget_status: row.x_lokal_budget_status,
+        x_lokal_budget_notes: row.x_lokal_budget_notes
+      });
+
+      if (this.dryRun) {
+        this.log.info(
+          sheet,
+          `[dry-run] update budget project ${projectXmlId}`,
+          values
+        );
+        return;
+      }
+
+      await this.writeSafe(
+        'project.project',
+        projectId,
+        values,
+        sheet,
+        `Budget project diupdate: ${projectXmlId}`
+      );
+    });
+  }
+}
   async processWebsitePages() {
     const sheet = '12_WEBSITE_PAGES';
     const rows = sheetRows(this.workbook, sheet);
