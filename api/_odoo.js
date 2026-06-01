@@ -68,7 +68,7 @@ class OdooClient {
 class LokalmartImporter {
   constructor(workbook, { dryRun = true } = {}) {
     this.workbook = workbook; this.dryRun = dryRun; this.log = new ImportLog(); this.odoo = new OdooClient({}, this.log);
-    this.cache = { model: new Map(), xmlid: new Map() }; this.virtualCounter = 1;
+    this.cache = { model: new Map(), xmlid: new Map(), fieldDefs: new Map(), virtualFields: new Map() }; this.virtualCounter = 1;
   }
   async run() {
     if (!this.workbook?.SheetNames?.length) throw new Error('Workbook kosong/tidak valid.');
@@ -117,6 +117,64 @@ class LokalmartImporter {
     this.cache.model.set(model, rows[0].id); return rows[0].id;
   }
   async modelExists(model) { try { await this.getModelId(model); return true; } catch (_) { return false; } }
+  registerVirtualField(model, fieldName, fieldDef = {}) {
+    if (isBlank(model) || isBlank(fieldName)) return;
+    if (!this.cache.virtualFields.has(model)) this.cache.virtualFields.set(model, new Map());
+    this.cache.virtualFields.get(model).set(fieldName, fieldDef);
+  }
+  async getModelFields(model) {
+    if (this.cache.fieldDefs.has(model)) return this.cache.fieldDefs.get(model);
+    const fields = await this.odoo.executeKw(model, 'fields_get', [], { attributes: ['string', 'type', 'selection', 'readonly', 'required'] });
+    this.cache.fieldDefs.set(model, fields || {});
+    return fields || {};
+  }
+  async filterValuesForModel(model, values, sheet) {
+    const cleaned = compactObject(values);
+    let fields = {};
+    try { fields = await this.getModelFields(model); }
+    catch (e) { this.log.warn(sheet, `Tidak bisa membaca fields_get ${model}; values dikirim apa adanya.`, { error: e.message }); return cleaned; }
+    const virtualFields = this.cache.virtualFields.get(model) || new Map();
+    const out = {};
+    for (const [key, value] of Object.entries(cleaned)) {
+      if (fields[key] || virtualFields.has(key)) out[key] = value;
+      else this.log.warn(sheet, `Field dilewati karena tidak ada di ${model}: ${key}`);
+    }
+    return out;
+  }
+  async adaptProductTypeValue(row, sheet) {
+    const fields = await this.getModelFields('product.template');
+    const raw = row.detailed_type || row.type || 'product';
+    const targetField = fields.detailed_type ? 'detailed_type' : (fields.type ? 'type' : null);
+    if (!targetField) {
+      this.log.warn(sheet, 'product.template tidak punya detailed_type maupun type; tipe produk dilewati.');
+      return {};
+    }
+    const fieldDef = fields[targetField] || {};
+    const selection = Array.isArray(fieldDef.selection) ? fieldDef.selection.map(x => Array.isArray(x) ? x[0] : x) : [];
+    let value = raw;
+    const aliases = {
+      stockable: 'product', storable: 'product', goods: 'product', barang: 'product',
+      consumable: 'consu', consume: 'consu', habis_pakai: 'consu',
+      service: 'service', jasa: 'service', combo: 'combo'
+    };
+    if (selection.length && !selection.includes(value)) {
+      const alias = aliases[String(value).toLowerCase()];
+      if (alias && selection.includes(alias)) value = alias;
+      else if (String(value).toLowerCase() === 'product' && selection.includes('consu')) value = 'consu';
+      else if (selection.includes('product')) value = 'product';
+      else if (selection.includes('consu')) value = 'consu';
+      else if (selection.includes('service')) value = 'service';
+      else value = selection[0];
+      this.log.warn(sheet, `Nilai tipe produk '${raw}' disesuaikan menjadi '${value}' untuk field ${targetField}.`);
+    }
+    return { [targetField]: value };
+  }
+  async createSafe(model, values, sheet, message) {
+    const filtered = await this.filterValuesForModel(model, values, sheet);
+    const id = await this.odoo.create(model, filtered);
+    this.log.ok(sheet, message, { id });
+    return id;
+  }
   async resolveXmlId(xmlid, expectedModel = null) {
     if (isBlank(xmlid)) return null;
     const key = expectedModel ? `${xmlid}|${expectedModel}` : String(xmlid);
@@ -156,7 +214,7 @@ class LokalmartImporter {
     }
   }
   async writeSafe(model, id, values, sheet, msg) {
-    const cleaned = compactObject(values); if (!Object.keys(cleaned).length) return;
+    const cleaned = await this.filterValuesForModel(model, values, sheet); if (!Object.keys(cleaned).length) return;
     try { await this.odoo.write(model, id, cleaned); this.log.ok(sheet, msg, { id }); }
     catch (e) { this.log.warn(sheet, `Write gagal untuk ${model}:${id}. Mungkin field belum ada/readonly.`, { error: e.message }); }
   }
@@ -180,10 +238,10 @@ class LokalmartImporter {
       if (isBlank(model) || isBlank(name) || isBlank(ttype)) { this.log.warn(sheet, `Row ${rowNum} dilewati: model/name/ttype kosong.`); continue; }
       if (!String(name).startsWith('x_')) throw new Error(`Row ${rowNum}: custom field wajib diawali x_: ${name}`);
       const modelId = await this.getModelId(model); const existing = await this.odoo.searchRead('ir.model.fields', [['model', '=', model], ['name', '=', name]], ['id', 'ttype'], 1);
-      if (existing.length) { if (existing[0].ttype !== ttype) throw new Error(`Field ${model}.${name} sudah ada tapi tipe ${existing[0].ttype}, bukan ${ttype}`); this.log.ok(sheet, `Field sudah ada: ${model}.${name}`); await this.ensureXmlId(xmlid, 'ir.model.fields', existing[0].id, sheet); continue; }
+      if (existing.length) { if (existing[0].ttype !== ttype) throw new Error(`Field ${model}.${name} sudah ada tapi tipe ${existing[0].ttype}, bukan ${ttype}`); this.log.ok(sheet, `Field sudah ada: ${model}.${name}`); this.registerVirtualField(model, name, {type: ttype}); await this.ensureXmlId(xmlid, 'ir.model.fields', existing[0].id, sheet); continue; }
       const values = compactObject({ name, field_description: row.field_description || row.field_label || name, model_id: modelId, ttype, relation: row.relation, state: 'manual', store: toBool(row.store, true), required: toBool(row.required, false), readonly: toBool(row.readonly, false), index: toBool(row.index, false), copied: toBool(row.copied, true), help: row.help || row.notes });
-      if (this.dryRun) { this.dryRecord(xmlid, 'ir.model.fields', sheet, `[dry-run] create field ${model}.${name}`); continue; }
-      const id = await this.odoo.create('ir.model.fields', values); this.log.ok(sheet, `Field dibuat: ${model}.${name}`, { id }); await this.ensureXmlId(xmlid, 'ir.model.fields', id, sheet);
+      if (this.dryRun) { this.registerVirtualField(model, name, {type: ttype}); this.dryRecord(xmlid, 'ir.model.fields', sheet, `[dry-run] create field ${model}.${name}`); continue; }
+      const id = await this.odoo.create('ir.model.fields', values); this.registerVirtualField(model, name, {type: ttype}); this.cache.fieldDefs.delete(model); this.log.ok(sheet, `Field dibuat: ${model}.${name}`, { id }); await this.ensureXmlId(xmlid, 'ir.model.fields', id, sheet);
     }
   }
   async getFieldId(fieldXmlid, model, fieldName) {
@@ -212,7 +270,7 @@ class LokalmartImporter {
       const lokalId = row.x_lokal_id || row.lokal_id; const domain = !isBlank(lokalId) ? [['x_lokal_id', '=', lokalId]] : [['name', '=', name]]; const found = await this.findByXmlIdOrDomain(xmlid, 'res.partner', domain, ['id', 'name']);
       const values = compactObject({ name, phone: row.phone, mobile: row.mobile || row.whatsapp, email: row.email, street: row.street, city: row.city, zip: row.zip, x_lokal_id: lokalId, x_lokal_role: row.x_lokal_role || row.role, x_lokal_member_type: row.x_lokal_member_type, x_lokal_points: toNumberOrNull(row.x_lokal_points), x_lokal_area: row.x_lokal_area || row.area, x_lokal_verification_status: row.x_lokal_verification_status });
       if (found) { if (this.dryRun) this.log.info(sheet, `[dry-run] update partner ${name}`); else await this.writeSafe('res.partner', found.id, values, sheet, `Partner diupdate: ${name}`); await this.ensureXmlId(xmlid, 'res.partner', found.id, sheet); }
-      else { if (this.dryRun) { this.dryRecord(xmlid, 'res.partner', sheet, `[dry-run] create partner ${name}`); continue; } const id = await this.odoo.create('res.partner', values); this.log.ok(sheet, `Partner dibuat: ${name}`, { id }); await this.ensureXmlId(xmlid, 'res.partner', id, sheet); }
+      else { if (this.dryRun) { this.dryRecord(xmlid, 'res.partner', sheet, `[dry-run] create partner ${name}`); continue; } const id = await this.createSafe('res.partner', values, sheet, `Partner dibuat: ${name}`); await this.ensureXmlId(xmlid, 'res.partner', id, sheet); }
     }
   }
   async processProducts() {
@@ -221,10 +279,11 @@ class LokalmartImporter {
       const rowNum = i + 2; const xmlid = row.external_id || row.id; const name = row.name; if (isBlank(name)) { this.log.warn(sheet, `Row ${rowNum} dilewati: name kosong.`); continue; }
       const lokalId = row.x_lokal_id || row.x_lokal_product_id || row.lokal_product_id; const domain = !isBlank(lokalId) ? [['x_lokal_id', '=', lokalId]] : (!isBlank(row.default_code) ? [['default_code', '=', row.default_code]] : [['name', '=', name]]);
       const vendorId = await this.m2o(row['x_lokal_vendor_partner_id/id'] || row.vendor_external_id, 'res.partner', sheet, false);
-      const values = compactObject({ name, default_code: row.default_code, barcode: row.barcode, list_price: toNumberOrNull(row.list_price || row.price), standard_price: toNumberOrNull(row.standard_price || row.cost), sale_ok: toBool(row.sale_ok, true), purchase_ok: toBool(row.purchase_ok, true), detailed_type: row.detailed_type || row.type || 'product', x_lokal_id: lokalId, x_lokal_tracking_level: row.x_lokal_tracking_level || row.tracking_level, x_lokal_passport_url: row.x_lokal_passport_url, x_lokal_vendor_partner_id: vendorId, x_lokal_origin_city: row.x_lokal_origin_city, x_lokal_origin_district: row.x_lokal_origin_district, x_lokal_verification_status: row.x_lokal_verification_status, x_lokal_story: row.x_lokal_story, x_lokal_proof_hash: row.x_lokal_proof_hash, x_lokal_public_visible: toBool(row.x_lokal_public_visible, true) });
+      const productTypeValue = await this.adaptProductTypeValue(row, sheet);
+      const values = compactObject({ name, default_code: row.default_code, barcode: row.barcode, list_price: toNumberOrNull(row.list_price || row.price), standard_price: toNumberOrNull(row.standard_price || row.cost), sale_ok: toBool(row.sale_ok, true), purchase_ok: toBool(row.purchase_ok, true), ...productTypeValue, x_lokal_id: lokalId, x_lokal_tracking_level: row.x_lokal_tracking_level || row.tracking_level, x_lokal_passport_url: row.x_lokal_passport_url, x_lokal_vendor_partner_id: vendorId, x_lokal_origin_city: row.x_lokal_origin_city, x_lokal_origin_district: row.x_lokal_origin_district, x_lokal_verification_status: row.x_lokal_verification_status, x_lokal_story: row.x_lokal_story, x_lokal_proof_hash: row.x_lokal_proof_hash, x_lokal_public_visible: toBool(row.x_lokal_public_visible, true) });
       const found = await this.findByXmlIdOrDomain(xmlid, 'product.template', domain, ['id', 'name']);
       if (found) { if (this.dryRun) this.log.info(sheet, `[dry-run] update product ${name}`); else await this.writeSafe('product.template', found.id, values, sheet, `Produk diupdate: ${name}`); await this.ensureXmlId(xmlid, 'product.template', found.id, sheet); }
-      else { if (this.dryRun) { this.dryRecord(xmlid, 'product.template', sheet, `[dry-run] create product ${name}`); continue; } const id = await this.odoo.create('product.template', values); this.log.ok(sheet, `Produk dibuat: ${name}`, { id }); await this.ensureXmlId(xmlid, 'product.template', id, sheet); }
+      else { if (this.dryRun) { this.dryRecord(xmlid, 'product.template', sheet, `[dry-run] create product ${name}`); continue; } const id = await this.createSafe('product.template', values, sheet, `Produk dibuat: ${name}`); await this.ensureXmlId(xmlid, 'product.template', id, sheet); }
     }
   }
   async productVariantId(templateId) { if (this.dryRun && this.isDryId(templateId)) return this.makeDryId('product.product', `variant_for_${templateId}`); const rows = await this.odoo.searchRead('product.product', [['product_tmpl_id', '=', templateId]], ['id'], 1); if (!rows.length) throw new Error(`product.product tidak ditemukan untuk template ${templateId}`); return rows[0].id; }
@@ -237,18 +296,18 @@ class LokalmartImporter {
       const found = await this.findByXmlIdOrDomain(xmlid, 'stock.lot', [['name', '=', name], ['product_id', '=', productId]], ['id', 'name']);
       const values = compactObject({ name, product_id: productId, x_lokal_batch_id: row.x_lokal_batch_id, x_lokal_unit_id: row.x_lokal_unit_id, x_lokal_certificate_url: row.x_lokal_certificate_url, x_lokal_production_date: row.x_lokal_production_date, x_lokal_expiry_date: row.x_lokal_expiry_date, x_lokal_proof_hash: row.x_lokal_proof_hash, x_lokal_status: row.x_lokal_status });
       if (found) { if (this.dryRun) this.log.info(sheet, `[dry-run] update stock.lot ${name}`); else await this.writeSafe('stock.lot', found.id, values, sheet, `Lot diupdate: ${name}`); await this.ensureXmlId(xmlid, 'stock.lot', found.id, sheet); }
-      else { if (this.dryRun) { this.dryRecord(xmlid, 'stock.lot', sheet, `[dry-run] create stock.lot ${name}`); continue; } const id = await this.odoo.create('stock.lot', values); this.log.ok(sheet, `Lot dibuat: ${name}`, { id }); await this.ensureXmlId(xmlid, 'stock.lot', id, sheet); }
+      else { if (this.dryRun) { this.dryRecord(xmlid, 'stock.lot', sheet, `[dry-run] create stock.lot ${name}`); continue; } const id = await this.createSafe('stock.lot', values, sheet, `Lot dibuat: ${name}`); await this.ensureXmlId(xmlid, 'stock.lot', id, sheet); }
     }
   }
   async processProjects() {
     const sheet = '07_PROJECTS'; const rows = sheetRows(this.workbook, sheet); if (!rows.length) { this.log.info(sheet, 'Sheet kosong/tidak ada.'); return; }
     if (!(await this.modelExists('project.project'))) { this.log.warn(sheet, 'Project tidak tersedia.'); return; }
-    for (const row of rows) { const xmlid = row.external_id || row.id; const name = row.name; if (isBlank(name)) continue; const found = await this.findByXmlIdOrDomain(xmlid, 'project.project', [['name', '=', name]], ['id', 'name']); const values = compactObject({ name, active: toBool(row.active, true), allow_milestones: toBool(row.allow_milestones, true), label_tasks: row.label_tasks, description: row.description }); if (found) { if (this.dryRun) this.log.info(sheet, `[dry-run] update project ${name}`); else await this.writeSafe('project.project', found.id, values, sheet, `Project diupdate: ${name}`); await this.ensureXmlId(xmlid, 'project.project', found.id, sheet); } else { if (this.dryRun) { this.dryRecord(xmlid, 'project.project', sheet, `[dry-run] create project ${name}`); continue; } const id = await this.odoo.create('project.project', values); this.log.ok(sheet, `Project dibuat: ${name}`, { id }); await this.ensureXmlId(xmlid, 'project.project', id, sheet); } }
+    for (const row of rows) { const xmlid = row.external_id || row.id; const name = row.name; if (isBlank(name)) continue; const found = await this.findByXmlIdOrDomain(xmlid, 'project.project', [['name', '=', name]], ['id', 'name']); const values = compactObject({ name, active: toBool(row.active, true), allow_milestones: toBool(row.allow_milestones, true), label_tasks: row.label_tasks, description: row.description }); if (found) { if (this.dryRun) this.log.info(sheet, `[dry-run] update project ${name}`); else await this.writeSafe('project.project', found.id, values, sheet, `Project diupdate: ${name}`); await this.ensureXmlId(xmlid, 'project.project', found.id, sheet); } else { if (this.dryRun) { this.dryRecord(xmlid, 'project.project', sheet, `[dry-run] create project ${name}`); continue; } const id = await this.createSafe('project.project', values, sheet, `Project dibuat: ${name}`); await this.ensureXmlId(xmlid, 'project.project', id, sheet); } }
   }
   async processProjectStages() {
     const sheet = '08_PROJECT_STAGES'; const rows = sheetRows(this.workbook, sheet); if (!rows.length) { this.log.info(sheet, 'Sheet kosong/tidak ada.'); return; }
     if (!(await this.modelExists('project.task.type'))) { this.log.warn(sheet, 'project.task.type tidak tersedia.'); return; }
-    for (const row of rows) { const xmlid = row.external_id || row.id; const name = row.name; if (isBlank(name)) continue; const found = await this.findByXmlIdOrDomain(xmlid, 'project.task.type', [['name', '=', name]], ['id', 'name']); const values = compactObject({ name, sequence: toNumberOrNull(row.sequence) || 10, fold: toBool(row.fold, false) }); if (found) { if (this.dryRun) this.log.info(sheet, `[dry-run] update stage ${name}`); else await this.writeSafe('project.task.type', found.id, values, sheet, `Stage diupdate: ${name}`); await this.ensureXmlId(xmlid, 'project.task.type', found.id, sheet); } else { if (this.dryRun) { this.dryRecord(xmlid, 'project.task.type', sheet, `[dry-run] create stage ${name}`); continue; } const id = await this.odoo.create('project.task.type', values); this.log.ok(sheet, `Stage dibuat: ${name}`, { id }); await this.ensureXmlId(xmlid, 'project.task.type', id, sheet); } }
+    for (const row of rows) { const xmlid = row.external_id || row.id; const name = row.name; if (isBlank(name)) continue; const found = await this.findByXmlIdOrDomain(xmlid, 'project.task.type', [['name', '=', name]], ['id', 'name']); const values = compactObject({ name, sequence: toNumberOrNull(row.sequence) || 10, fold: toBool(row.fold, false) }); if (found) { if (this.dryRun) this.log.info(sheet, `[dry-run] update stage ${name}`); else await this.writeSafe('project.task.type', found.id, values, sheet, `Stage diupdate: ${name}`); await this.ensureXmlId(xmlid, 'project.task.type', found.id, sheet); } else { if (this.dryRun) { this.dryRecord(xmlid, 'project.task.type', sheet, `[dry-run] create stage ${name}`); continue; } const id = await this.createSafe('project.task.type', values, sheet, `Stage dibuat: ${name}`); await this.ensureXmlId(xmlid, 'project.task.type', id, sheet); } }
   }
   async processProjectTags() {
     const sheet = '09_PROJECT_TAGS'; const rows = sheetRows(this.workbook, sheet); if (!rows.length) { this.log.info(sheet, 'Sheet kosong/tidak ada.'); return; }
@@ -258,7 +317,7 @@ class LokalmartImporter {
   async processMilestones() {
     const sheet = '10_MILESTONES'; const rows = sheetRows(this.workbook, sheet); if (!rows.length) { this.log.info(sheet, 'Sheet kosong/tidak ada.'); return; }
     if (!(await this.modelExists('project.milestone'))) { this.log.warn(sheet, 'project.milestone tidak tersedia.'); return; }
-    for (const row of rows) { const xmlid = row.external_id || row.id; const name = row.name; if (isBlank(name)) continue; const projectId = await this.m2o(row['project_id/id'] || row.project_external_id, 'project.project', sheet, true); const found = await this.findByXmlIdOrDomain(xmlid, 'project.milestone', [['name', '=', name], ['project_id', '=', projectId]], ['id', 'name']); const values = compactObject({ name, project_id: projectId, deadline: row.deadline || row.date_deadline, is_reached: toBool(row.is_reached, false) }); if (found) { if (this.dryRun) this.log.info(sheet, `[dry-run] update milestone ${name}`); else await this.writeSafe('project.milestone', found.id, values, sheet, `Milestone diupdate: ${name}`); await this.ensureXmlId(xmlid, 'project.milestone', found.id, sheet); } else { if (this.dryRun) { this.dryRecord(xmlid, 'project.milestone', sheet, `[dry-run] create milestone ${name}`); continue; } const id = await this.odoo.create('project.milestone', values); this.log.ok(sheet, `Milestone dibuat: ${name}`, { id }); await this.ensureXmlId(xmlid, 'project.milestone', id, sheet); } }
+    for (const row of rows) { const xmlid = row.external_id || row.id; const name = row.name; if (isBlank(name)) continue; const projectId = await this.m2o(row['project_id/id'] || row.project_external_id, 'project.project', sheet, true); const found = await this.findByXmlIdOrDomain(xmlid, 'project.milestone', [['name', '=', name], ['project_id', '=', projectId]], ['id', 'name']); const values = compactObject({ name, project_id: projectId, deadline: row.deadline || row.date_deadline, is_reached: toBool(row.is_reached, false) }); if (found) { if (this.dryRun) this.log.info(sheet, `[dry-run] update milestone ${name}`); else await this.writeSafe('project.milestone', found.id, values, sheet, `Milestone diupdate: ${name}`); await this.ensureXmlId(xmlid, 'project.milestone', found.id, sheet); } else { if (this.dryRun) { this.dryRecord(xmlid, 'project.milestone', sheet, `[dry-run] create milestone ${name}`); continue; } const id = await this.createSafe('project.milestone', values, sheet, `Milestone dibuat: ${name}`); await this.ensureXmlId(xmlid, 'project.milestone', id, sheet); } }
   }
   async processTasks() {
     const sheet = '11_TASKS'; const rows = sheetRows(this.workbook, sheet); if (!rows.length) { this.log.info(sheet, 'Sheet kosong/tidak ada.'); return; }
@@ -268,7 +327,7 @@ class LokalmartImporter {
       const projectId = await this.m2o(row['project_id/id'] || row.project_external_id, 'project.project', sheet, true); const stageId = await this.m2o(row['stage_id/id'], 'project.task.type', sheet, false); const milestoneId = await this.m2o(row['milestone_id/id'], 'project.milestone', sheet, false); const tagCmd = await this.m2m(row['tag_ids/id'], 'project.tags', sheet);
       const found = await this.findByXmlIdOrDomain(xmlid, 'project.task', [['name', '=', name], ['project_id', '=', projectId]], ['id', 'name']); const values = compactObject({ name, project_id: projectId, stage_id: stageId, milestone_id: milestoneId, date_deadline: row.date_deadline, allocated_hours: toNumberOrNull(row.allocated_hours), priority: row.priority, sequence: toNumberOrNull(row.sequence), description: row.description }); if (tagCmd) values.tag_ids = tagCmd;
       if (found) { if (this.dryRun) this.log.info(sheet, `[dry-run] update task ${name}`); else await this.writeSafe('project.task', found.id, values, sheet, `Task diupdate: ${name}`); await this.ensureXmlId(xmlid, 'project.task', found.id, sheet); }
-      else { if (this.dryRun) { this.dryRecord(xmlid, 'project.task', sheet, `[dry-run] create task ${name}`); continue; } const id = await this.odoo.create('project.task', values); this.log.ok(sheet, `Task dibuat: ${name}`, { id }); await this.ensureXmlId(xmlid, 'project.task', id, sheet); }
+      else { if (this.dryRun) { this.dryRecord(xmlid, 'project.task', sheet, `[dry-run] create task ${name}`); continue; } const id = await this.createSafe('project.task', values, sheet, `Task dibuat: ${name}`); await this.ensureXmlId(xmlid, 'project.task', id, sheet); }
     }
   }
   async processWebsitePages() { const sheet = '12_WEBSITE_PAGES'; const rows = sheetRows(this.workbook, sheet); if (!rows.length) { this.log.info(sheet, 'Sheet kosong/tidak ada.'); return; } this.log.warn(sheet, 'Website page tidak ditulis otomatis agar tidak merusak view. Sheet ini dibaca sebagai rencana.'); }
