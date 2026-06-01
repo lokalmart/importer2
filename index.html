@@ -537,29 +537,125 @@ async function loadConfig() {
   }
 }
 
+const IMPORT_SHEETS = [
+  '01_MODELS_CHECK',
+  '02_FIELDS',
+  '03_SELECTIONS',
+  '04_PARTNERS',
+  '05_PRODUCTS',
+  '06_STOCK_LOTS',
+  '07_PROJECTS',
+  '08_PROJECT_STAGES',
+  '09_PROJECT_TAGS',
+  '10_MILESTONES',
+  '11_TASKS',
+  '12_WEBSITE_PAGES',
+  '13_QR_ID_REGISTRY'
+];
+
+function mergeSummaries(target, source) {
+  const result = target || {};
+  const s = source || {};
+
+  result.ok = (result.ok || 0) + (s.ok || 0);
+  result.warn = (result.warn || 0) + (s.warn || 0);
+  result.error = (result.error || 0) + (s.error || 0);
+  result.info = (result.info || 0) + (s.info || 0);
+
+  return result;
+}
+
+function appendLogs(items) {
+  showStats();
+
+  (items || []).forEach(function (item) {
+    const level = safeLevel(item.level);
+    const div = document.createElement('div');
+    div.className = 'log';
+
+    div.innerHTML =
+      '<div class="level ' + level + '">' + escapeHtml(level) + '</div>' +
+      '<div class="sheet">' + escapeHtml(item.sheet || '') + '</div>' +
+      '<div>' + escapeHtml(item.message || '') + '</div>';
+
+    logs.appendChild(div);
+  });
+
+  logs.scrollTop = logs.scrollHeight;
+}
+
 async function runImport(dryRun) {
   if (!selectedFile) return;
 
-  setBusy(true, 'Membaca file XLSX dan mengirim ke importer...');
+  setBusy(true, 'Membaca file XLSX dan menyiapkan import bertahap...');
+
+  const allLogs = [];
+  let allSummary = {};
 
   try {
     const fileBase64 = await fileToBase64(selectedFile);
 
-    const result = await api('/api/import-xlsx', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        dryRun: dryRun ? 'true' : 'false',
-        fileName: selectedFile.name,
-        fileBase64: fileBase64
-      })
-    });
+    logs.innerHTML =
+      '<div class="log">' +
+      '<div class="level info">INFO</div>' +
+      '<div class="sheet">SYSTEM</div>' +
+      '<div>Import akan diproses bertahap per sheet agar tidak timeout di Vercel.</div>' +
+      '</div>';
 
-    render(result);
+    for (let i = 0; i < IMPORT_SHEETS.length; i++) {
+      const sheet = IMPORT_SHEETS[i];
+
+      const progressLog = {
+        level: 'info',
+        sheet: 'SYSTEM',
+        message: 'Memproses ' + sheet + ' (' + (i + 1) + '/' + IMPORT_SHEETS.length + ')...'
+      };
+
+      appendLogs([progressLog]);
+
+      const result = await api('/api/import-xlsx', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          dryRun: dryRun ? 'true' : 'false',
+          fileName: selectedFile.name,
+          fileBase64: fileBase64,
+          onlySheet: sheet
+        })
+      });
+
+      allSummary = mergeSummaries(allSummary, result.summary || {});
+      updateCounts(allSummary);
+
+      const resultLogs = result.logs || [];
+      allLogs.push.apply(allLogs, resultLogs);
+      appendLogs(resultLogs);
+    }
+
+    appendLogs([
+      {
+        level: 'ok',
+        sheet: 'SYSTEM',
+        message: dryRun
+          ? 'Dry Run bertahap selesai. Periksa log warning/error sebelum Import Now.'
+          : 'Import Now bertahap selesai. Periksa log untuk baris yang berhasil atau dilewati.'
+      }
+    ]);
+
+    updateCounts(allSummary);
   } catch (error) {
-    renderSingleError('SYSTEM', error.message);
+    appendLogs([
+      {
+        level: 'error',
+        sheet: 'SYSTEM',
+        message: error.message
+      }
+    ]);
+
+    allSummary.error = (allSummary.error || 0) + 1;
+    updateCounts(allSummary);
   } finally {
     setBusy(false);
   }
