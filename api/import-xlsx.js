@@ -14,7 +14,8 @@ const SHEET_RUNNERS = {
   '10_MILESTONES': 'processMilestones',
   '11_TASKS': 'processTasks',
   '12_WEBSITE_PAGES': 'processWebsitePages',
-  '13_QR_ID_REGISTRY': 'processQrRegistry'
+  '13_QR_ID_REGISTRY': 'processQrRegistry',
+  '14_PROJECT_BUDGETS': 'processProjectBudgets',
 };
 
 module.exports = async function handler(req, res) {
