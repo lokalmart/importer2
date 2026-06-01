@@ -1,6 +1,22 @@
 const XLSX = require('xlsx');
 const { LokalmartImporter, ImportLog, toBool } = require('./_odoo');
 
+const SHEET_RUNNERS = {
+  '01_MODELS_CHECK': 'processModelsCheck',
+  '02_FIELDS': 'processFields',
+  '03_SELECTIONS': 'processSelections',
+  '04_PARTNERS': 'processPartners',
+  '05_PRODUCTS': 'processProducts',
+  '06_STOCK_LOTS': 'processStockLots',
+  '07_PROJECTS': 'processProjects',
+  '08_PROJECT_STAGES': 'processProjectStages',
+  '09_PROJECT_TAGS': 'processProjectTags',
+  '10_MILESTONES': 'processMilestones',
+  '11_TASKS': 'processTasks',
+  '12_WEBSITE_PAGES': 'processWebsitePages',
+  '13_QR_ID_REGISTRY': 'processQrRegistry'
+};
+
 module.exports = async function handler(req, res) {
   const log = new ImportLog();
 
@@ -23,6 +39,7 @@ module.exports = async function handler(req, res) {
     }
 
     const dryRun = toBool(req.body?.dryRun, true);
+    const onlySheet = String(req.body?.onlySheet || '').trim();
 
     let buffer = null;
 
@@ -40,6 +57,34 @@ module.exports = async function handler(req, res) {
     });
 
     const importer = new LokalmartImporter(workbook, { dryRun });
+
+    if (onlySheet) {
+      const methodName = SHEET_RUNNERS[onlySheet];
+
+      if (!methodName || typeof importer[methodName] !== 'function') {
+        throw new Error(`Sheet tidak didukung importer: ${onlySheet}`);
+      }
+
+      importer.log.info('SYSTEM', `Mode bertahap: ${dryRun ? 'DRY RUN' : 'IMPORT NOW'} sheet ${onlySheet}`);
+
+      await importer.odoo.authenticate();
+
+      try {
+        await importer[methodName]();
+      } catch (e) {
+        importer.log.error(onlySheet, `Sheet gagal: ${e.message}`);
+      }
+
+      importer.log.ok('SYSTEM', `Selesai memproses sheet ${onlySheet}`);
+
+      return res.status(200).json({
+        ok: true,
+        sheet: onlySheet,
+        summary: importer.log.summary(),
+        logs: importer.log.lines
+      });
+    }
+
     const result = await importer.run();
 
     return res.status(200).json({
