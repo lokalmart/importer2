@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>Lokalmart Odoo Page Scanner V3</title>
+  <title>Lokalmart Odoo Page Scanner + Importer V4</title>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <style>
     :root{
@@ -81,14 +81,16 @@
   <div class="wrap">
     <section class="hero">
       <div class="card">
-        <div class="badge"><span class="dot"></span> Lokalmart Odoo Structure Scanner V3</div>
+        <div class="badge"><span class="dot"></span> Lokalmart Odoo Structure Scanner + Importer V4</div>
         <h1>Scan semua page, deteksi yang hilang, lalu buat `/scan` langsung.</h1>
-        <p>Versi ini tidak hanya membaca fields. Ia membaca record `website.page`, `website.menu`, `ir.ui.view`, controller page jika tersedia, lalu bisa membuat halaman baru lewat RPC.</p>
+        <p>Versi ini tidak hanya membaca fields. Ia membaca record `website.page`, `website.menu`, `ir.ui.view`, controller page jika tersedia, lalu bisa membuat halaman baru lewat RPC dan mengimpor XLSX/JSON page.</p>
         <div class="btns">
           <button class="primary" id="btnTest">Test koneksi</button>
           <button class="blue" id="btnScan">Scan Semua Pages</button>
           <button class="orange" id="btnUpsertScan">Upsert /scan</button>
           <button class="purple" id="btnExport">Export XLSX</button>
+          <button class="danger" id="btnChooseImport">Import XLSX/JSON</button>
+          <input id="importFile" type="file" accept=".xlsx,.xls,.json,application/json" class="hidden"/>
         </div>
       </div>
       <div class="card">
@@ -502,6 +504,137 @@
       }
     }
   }
+
+  function rowValue(row, keys) {
+    for (const k of keys) {
+      if (row[k] !== undefined && row[k] !== null && String(row[k]).trim() !== "") return row[k];
+    }
+    return undefined;
+  }
+  function parseMaybeBool(v) {
+    if (typeof v !== "string") return v;
+    const s = v.trim().toLowerCase();
+    if (["true","yes","ya","1"].includes(s)) return true;
+    if (["false","no","tidak","0"].includes(s)) return false;
+    return v;
+  }
+  function cleanImportRow(row) {
+    const out = {};
+    Object.entries(row || {}).forEach(([k,v]) => {
+      const key = String(k).trim();
+      if (!key) return;
+      if (key === "id") return; // External ID milik importer Odoo; tidak dikirim sebagai field RPC.
+      if (v === undefined || v === null) return;
+      if (typeof v === "string" && v.trim() === "") return;
+      out[key] = parseMaybeBool(v);
+    });
+    return out;
+  }
+  function modelFromSheetName(name) {
+    const n = String(name || "").toLowerCase();
+    if (n.includes("website.page")) return "website.page";
+    if (n.includes("ir.ui.view")) return "ir.ui.view";
+    if (n.includes("website.menu")) return "website.menu";
+    return "";
+  }
+  async function findExistingForImport(model, values) {
+    if (model === "website.page") {
+      if (values.url) {
+        const r = await rpc(model, "search_read", [[["url","=",String(values.url)]]], {fields:["id","name","url"], limit:1});
+        if (r.length) return r[0].id;
+      }
+      if (values.key) {
+        const r = await rpc(model, "search_read", [[["key","=",String(values.key)]]], {fields:["id","name","key"], limit:1});
+        if (r.length) return r[0].id;
+      }
+    }
+    if (model === "ir.ui.view") {
+      if (values.key) {
+        const r = await rpc(model, "search_read", [[["key","=",String(values.key)]]], {fields:["id","name","key"], limit:1});
+        if (r.length) return r[0].id;
+      }
+      if (values.name) {
+        const r = await rpc(model, "search_read", [[["name","=",String(values.name)],["type","=",values.type || "qweb"]]], {fields:["id","name"], limit:1});
+        if (r.length) return r[0].id;
+      }
+    }
+    if (model === "website.menu") {
+      if (values.url) {
+        const r = await rpc(model, "search_read", [[["url","=",String(values.url)]]], {fields:["id","name","url"], limit:1});
+        if (r.length) return r[0].id;
+      }
+      if (values.name) {
+        const r = await rpc(model, "search_read", [[["name","=",String(values.name)]]], {fields:["id","name"], limit:1});
+        if (r.length) return r[0].id;
+      }
+    }
+    return null;
+  }
+  async function importRowsToOdoo(model, rows) {
+    if (!(await modelExists(model))) throw new Error(`Model tidak tersedia: ${model}`);
+    await fieldsGet(model);
+    let created = 0, updated = 0, skipped = 0;
+    for (const raw of rows) {
+      const values = filterValuesByFields(model, cleanImportRow(raw));
+      if (!Object.keys(values).length) { skipped++; continue; }
+      try {
+        const existingId = await findExistingForImport(model, values);
+        if (existingId) {
+          await rpc(model, "write", [[existingId], values]);
+          updated++;
+          log(`Update ${model} #${existingId}`, values.url || values.key || values.name || "");
+        } else {
+          const newId = await rpc(model, "create", [values]);
+          created++;
+          log(`Create ${model} #${newId}`, values.url || values.key || values.name || "");
+        }
+      } catch (e) {
+        skipped++;
+        log(`Gagal import row ${model}`, {error:e.message, row:raw});
+      }
+    }
+    return {model, created, updated, skipped};
+  }
+  async function importFileToOdoo(file) {
+    if (!file) return;
+    log("Mulai import file ke Odoo...", file.name);
+    await test();
+    const lower = file.name.toLowerCase();
+    let groups = [];
+    if (lower.endsWith(".json")) {
+      const txt = await file.text();
+      const data = JSON.parse(txt);
+      if (Array.isArray(data)) {
+        const model = data[0]?.model || "website.page";
+        groups.push({model, rows:data});
+      } else if (data && typeof data === "object") {
+        Object.entries(data).forEach(([model, rows]) => { if (Array.isArray(rows)) groups.push({model, rows}); });
+      }
+    } else {
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, {type:"array"});
+      for (const sheetName of wb.SheetNames) {
+        const model = modelFromSheetName(sheetName);
+        if (!model) continue;
+        const rows = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], {defval:""});
+        const importRows = rows.filter(r => Object.values(r).some(v => String(v || "").trim() !== ""));
+        if (importRows.length) groups.push({model, rows:importRows});
+      }
+    }
+    if (!groups.length) {
+      alert("File terbaca, tetapi tidak ada sheet import yang dikenali. Nama sheet harus memuat website.page, ir.ui.view, atau website.menu.");
+      return;
+    }
+    // Urutan penting: view dulu, page, lalu menu.
+    const order = {"ir.ui.view":1,"website.page":2,"website.menu":3};
+    groups.sort((a,b)=>(order[a.model]||9)-(order[b.model]||9));
+    const summary = [];
+    for (const g of groups) summary.push(await importRowsToOdoo(g.model, g.rows));
+    log("Import selesai.", summary);
+    await scanAll();
+    alert("Import selesai. Lihat tab Log untuk detail create/update/skipped.");
+  }
+
   function exportXlsx() {
     const wb = XLSX.utils.book_new();
     const meta = [
@@ -549,6 +682,8 @@
   $("btnScan").addEventListener("click",()=>scanAll().catch(e=>{log("Scan gagal.",e.message);alert(e.message);}));
   $("btnUpsertScan").addEventListener("click",()=>upsertScanPage().catch(e=>{log("Upsert gagal.",e.message);alert(e.message);}));
   $("btnExport").addEventListener("click",exportXlsx);
+  $("btnChooseImport").addEventListener("click",()=>$("importFile").click());
+  $("importFile").addEventListener("change",(e)=>importFileToOdoo(e.target.files[0]).catch(err=>{log("Import gagal.",err.message);alert(err.message);}));
 })();
 </script>
 </body>
