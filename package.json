@@ -1,9 +1,8 @@
 {
-  "name": "lokalmart-importer-v8-migration-safe",
-  "version": "8.0.0",
+  "name": "lokalmart-importer-v10-image-import",
+  "version": "10.0.0",
   "type": "module",
   "private": true,
-  "description": "Lokalmart Odoo importer, autopsy auditor, and migration-safe exporter",
   "scripts": {
     "dev": "vercel dev",
     "deploy": "vercel --prod"
