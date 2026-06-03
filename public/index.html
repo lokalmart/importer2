@@ -3,9 +3,54 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>Lokalmart Universal Odoo XLSX Importer V6</title>
+  <title>Lokalmart Universal Odoo XLSX Importer V6.1</title>
 
-  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script>
+    window.__xlsxReady = new Promise(function(resolve, reject){
+      function loadScript(src, onError){
+        var s = document.createElement("script");
+        s.src = src;
+        s.async = true;
+        s.onload = function(){
+          if (window.XLSX) {
+            resolve(window.XLSX);
+          } else if (onError) {
+            onError();
+          } else {
+            reject(new Error("Library XLSX gagal dimuat."));
+          }
+        };
+        s.onerror = function(){
+          if (onError) {
+            onError();
+          } else {
+            reject(new Error("Library XLSX gagal dimuat dari semua CDN."));
+          }
+        };
+        document.head.appendChild(s);
+      }
+
+      loadScript(
+        "https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js",
+        function(){
+          loadScript(
+            "https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js",
+            function(){
+              loadScript(
+                "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"
+              );
+            }
+          );
+        }
+      );
+    });
+
+    async function getXLSX(){
+      if (window.XLSX) return window.XLSX;
+      if (window.__xlsxReady) return await window.__xlsxReady;
+      throw new Error("XLSX belum tersedia. Refresh halaman lalu coba lagi.");
+    }
+  </script>
 
   <style>
     :root{
@@ -336,7 +381,7 @@
 
   <section class="hero">
     <div class="card">
-      <div class="badge"><span class="dot"></span> Lokalmart Universal Odoo XLSX Importer V6</div>
+      <div class="badge"><span class="dot"></span> Lokalmart Universal Odoo XLSX Importer V6.1</div>
       <h1>Satu importer untuk pages, custom fields, project, produk, course, dan data Odoo Lokalmart.</h1>
       <p>
         Format XLSX dibuat universal: nama sheet adalah nama model Odoo, atau isi kolom <span class="mono">_model</span>.
@@ -645,7 +690,11 @@ mail.activity.type</textarea>
       "Action":"_action",
       "action":"_action",
       "Model":"_model",
-      "model":"model",
+      "_model":"_model",
+      "_action":"_action",
+      "_external_id":"_external_id",
+      "_match":"_match",
+      "_odoo_id":"_odoo_id",
       "Match":"_match",
       "match":"_match"
     };
@@ -718,11 +767,11 @@ mail.activity.type</textarea>
       .filter(r=>Object.values(r).some(v=>!isEmptyValue(v)));
   }
 
-  function parseWorkbook(wb){
+  function parseWorkbook(wb, XLSXLib){
     const groups = [];
 
     wb.SheetNames.forEach(sheetName=>{
-      const rows = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], {defval:""});
+      const rows = XLSXLib.utils.sheet_to_json(wb.Sheets[sheetName], {defval:""});
       const cleanRows = normalizeRows(rows);
 
       if(!cleanRows.length) return;
@@ -789,10 +838,11 @@ mail.activity.type</textarea>
 
       state.groups = groups;
     } else {
+      const XLSXLib = await getXLSX();
       const buf = await file.arrayBuffer();
-      const wb = XLSX.read(buf, {type:"array"});
+      const wb = XLSXLib.read(buf, {type:"array"});
       state.workbook = wb;
-      state.groups = parseWorkbook(wb);
+      state.groups = parseWorkbook(wb, XLSXLib);
     }
 
     $("fileInfo").textContent = `${file.name} — ${state.groups.length} sheet import terbaca.`;
@@ -1463,11 +1513,12 @@ mail.activity.type</textarea>
     alert(dryRun ? "Dry run selesai. Lihat tab Result/Log." : "Import selesai. Lihat tab Result/Log.");
   }
 
-  function exportTemplate(){
-    const wb = XLSX.utils.book_new();
+  async function exportTemplate(){
+    const XLSXLib = await getXLSX();
+    const wb = XLSXLib.utils.book_new();
 
     const readme = [
-      ["Lokalmart Universal XLSX Importer V6"],
+      ["Lokalmart Universal XLSX Importer V6.1"],
       [""],
       ["Cara pakai:"],
       ["1. Nama sheet gunakan nama model Odoo, contoh project.task"],
@@ -1484,7 +1535,7 @@ mail.activity.type</textarea>
       ["skip = lewati row"]
     ];
 
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(readme), "00_README");
+    XLSXLib.utils.book_append_sheet(wb, XLSXLib.utils.aoa_to_sheet(readme), "00_README");
 
     const projectRows = [
       {
@@ -1538,12 +1589,12 @@ mail.activity.type</textarea>
       }
     ];
 
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(projectRows), "project.project");
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(taskRows), "project.task");
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(pageRows), "website.page");
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(customFieldRows), "ir.model.fields");
+    XLSXLib.utils.book_append_sheet(wb, XLSXLib.utils.json_to_sheet(projectRows), "project.project");
+    XLSXLib.utils.book_append_sheet(wb, XLSXLib.utils.json_to_sheet(taskRows), "project.task");
+    XLSXLib.utils.book_append_sheet(wb, XLSXLib.utils.json_to_sheet(pageRows), "website.page");
+    XLSXLib.utils.book_append_sheet(wb, XLSXLib.utils.json_to_sheet(customFieldRows), "ir.model.fields");
 
-    XLSX.writeFile(wb, "lokalmart_universal_import_template_v6.xlsx");
+    XLSXLib.writeFile(wb, "lokalmart_universal_import_template_v6_1.xlsx");
   }
 
   document.querySelectorAll(".tab").forEach(btn=>{
@@ -1599,7 +1650,12 @@ mail.activity.type</textarea>
     });
   });
 
-  $("btnExportTemplate").addEventListener("click",exportTemplate);
+  $("btnExportTemplate").addEventListener("click",function(){
+    exportTemplate().catch(function(e){
+      log("Export template gagal.", e.message);
+      alert(e.message);
+    });
+  });
 
   const drop = $("drop");
 
