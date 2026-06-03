@@ -1,9 +1,9 @@
 {
-  "name": "lokalmart-odoo-page-scanner-importer-v5",
-  "version": "5.0.0",
+  "name": "lokalmart-odoo-universal-xlsx-importer-v6",
+  "version": "6.0.0",
   "type": "module",
   "private": true,
-  "description": "Lokalmart Odoo Website Page Scanner, Importer, and Missing Page Upserter for Vercel",
+  "description": "Universal XLSX/JSON importer and structure scanner for Lokalmart Odoo via Vercel",
   "scripts": {
     "dev": "vercel dev",
     "deploy": "vercel --prod"
