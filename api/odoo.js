@@ -1,7 +1,11 @@
 /**
- * Vercel Serverless Function: Odoo JSON-RPC proxy for Lokalmart Page Scanner + Importer V5.
- * It does not store credentials. Each request carries baseUrl, db, login, password/api key.
+ * Lokalmart Universal Odoo RPC Proxy V6
+ * Vercel Serverless Function.
+ *
+ * Tidak menyimpan credential.
+ * Semua credential dikirim dari browser hanya untuk request berjalan.
  */
+
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
@@ -9,8 +13,12 @@ export default async function handler(req, res) {
   res.setHeader("Cache-Control", "no-store");
 
   if (req.method === "OPTIONS") return res.status(204).end();
+
   if (req.method !== "POST") {
-    return res.status(405).json({ ok: false, error: "Use POST" });
+    return res.status(405).json({
+      ok: false,
+      error: "Use POST"
+    });
   }
 
   try {
@@ -23,17 +31,17 @@ export default async function handler(req, res) {
       db,
       login,
       password,
+      uid: providedUid,
       model,
       method,
       args = [],
-      kwargs = {},
-      uid: providedUid
+      kwargs = {}
     } = body;
 
     if (!baseUrl || !db || !login || !password) {
       return res.status(400).json({
         ok: false,
-        error: "Missing baseUrl/db/login/password"
+        error: "Missing baseUrl, db, login, or password/API key"
       });
     }
 
@@ -43,7 +51,9 @@ export default async function handler(req, res) {
     async function jsonRpc(service, rpcMethod, rpcArgs) {
       const response = await fetch(rpcUrl, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json"
+        },
         body: JSON.stringify({
           jsonrpc: "2.0",
           method: "call",
@@ -63,16 +73,18 @@ export default async function handler(req, res) {
         payload = JSON.parse(text);
       } catch (err) {
         throw new Error(
-          `Odoo returned non-JSON response (${response.status}): ${text.slice(0, 500)}`
+          `Odoo returned non-JSON response (${response.status}): ${text.slice(0, 800)}`
         );
       }
 
       if (!response.ok || payload.error) {
         const msg =
           payload.error?.data?.message ||
+          payload.error?.data?.debug ||
           payload.error?.message ||
           text;
-        throw new Error(msg);
+
+        throw new Error(String(msg).slice(0, 4000));
       }
 
       return payload.result;
@@ -88,7 +100,7 @@ export default async function handler(req, res) {
     if (!uid) {
       return res.status(401).json({
         ok: false,
-        error: "Authentication failed. Check database, email/login, and API key/password."
+        error: "Authentication failed. Check database name, login, and password/API key."
       });
     }
 
