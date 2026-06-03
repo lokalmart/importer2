@@ -1,17 +1,14 @@
 {
-  "name": "lokalmart-web3-odoo-importer",
-  "version": "1.0.0",
+  "name": "lokalmart-odoo-page-scanner-v3",
+  "version": "3.0.0",
+  "type": "module",
   "private": true,
-  "description": "Lokalmart Web3 XLSX multi-sheet importer for Odoo External API on Vercel",
+  "description": "Lokalmart Odoo Website Page Scanner and Missing Page Upserter for Vercel",
   "scripts": {
     "dev": "vercel dev",
-    "start": "vercel dev"
+    "deploy": "vercel --prod"
   },
-  "dependencies": {
-    "formidable": "^3.5.2",
-    "xlsx": "^0.18.5"
-  },
-  "devDependencies": {
-    "vercel": "^33.7.1"
+  "engines": {
+    "node": ">=18"
   }
 }
