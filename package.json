@@ -1,17 +1,17 @@
 {
-  "name": "lokalmart-odoo-universal-importer-auditor-v7",
-  "version": "7.0.0",
+  "name": "lokalmart-importer-v8-migration-safe",
+  "version": "8.0.0",
   "type": "module",
   "private": true,
-  "description": "Universal XLSX/JSON importer plus full Odoo database autopsy exporter for Lokalmart",
+  "description": "Lokalmart Odoo importer, autopsy auditor, and migration-safe exporter",
   "scripts": {
     "dev": "vercel dev",
     "deploy": "vercel --prod"
   },
-  "dependencies": {
-    "xlsx": "^0.18.5"
-  },
   "engines": {
     "node": ">=18"
+  },
+  "dependencies": {
+    "xlsx": "^0.18.5"
   }
 }
