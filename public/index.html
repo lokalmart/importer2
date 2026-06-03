@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>Lokalmart Odoo Page Scanner + Importer V4</title>
+  <title>Lokalmart Odoo Page Scanner + Importer V5</title>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <style>
     :root{
@@ -81,9 +81,9 @@
   <div class="wrap">
     <section class="hero">
       <div class="card">
-        <div class="badge"><span class="dot"></span> Lokalmart Odoo Structure Scanner + Importer V4</div>
+        <div class="badge"><span class="dot"></span> Lokalmart Odoo Structure Scanner + Importer V5</div>
         <h1>Scan semua page, deteksi yang hilang, lalu buat `/scan` langsung.</h1>
-        <p>Versi ini tidak hanya membaca fields. Ia membaca record `website.page`, `website.menu`, `ir.ui.view`, controller page jika tersedia, lalu bisa membuat halaman baru lewat RPC dan mengimpor XLSX/JSON page.</p>
+        <p>Versi V5 ini membaca fields secara adaptif agar tidak gagal ketika model Odoo berbeda antar versi. Ia membaca record `website.page`, `website.menu`, `ir.ui.view`, controller page jika tersedia, lalu bisa membuat halaman baru lewat RPC dan mengimpor XLSX/JSON page.</p>
         <div class="btns">
           <button class="primary" id="btnTest">Test koneksi</button>
           <button class="blue" id="btnScan">Scan Semua Pages</button>
@@ -153,11 +153,14 @@
   const state = {
     uid:null, pages:[], menus:[], views:[], controllers:[], fields:{}, missing:[], lastScanAt:null
   };
+
   const $ = (id)=>document.getElementById(id);
+
   const log = (msg, data)=>{
     const line = `[${new Date().toLocaleTimeString()}] ${msg}` + (data ? `\n${typeof data === "string" ? data : JSON.stringify(data,null,2)}` : "");
     $("log").textContent = line + "\n\n" + $("log").textContent;
   };
+
   const getCreds = ()=>({
     baseUrl: $("baseUrl").value.trim().replace(/\/+$/,""),
     db: $("db").value.trim(),
@@ -167,104 +170,215 @@
 
   async function rpc(model, method, args=[], kwargs={}) {
     const body = {...getCreds(), uid: state.uid, model, method, args, kwargs};
-    const res = await fetch("/api/odoo", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body)});
+    const res = await fetch("/api/odoo", {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify(body)
+    });
     const payload = await res.json().catch(()=>({ok:false,error:"Invalid JSON response"}));
     if (!payload.ok) throw new Error(payload.error || "RPC failed");
     if (payload.uid) state.uid = payload.uid;
     return payload.result;
   }
+
   async function test() {
-    const res = await fetch("/api/odoo", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(getCreds())});
+    const res = await fetch("/api/odoo", {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify(getCreds())
+    });
     const payload = await res.json();
     if (!payload.ok) throw new Error(payload.error || "Auth failed");
     state.uid = payload.uid;
     log("Koneksi berhasil.", {uid: state.uid});
     alert("Koneksi berhasil.");
   }
+
   async function modelExists(model) {
-    const found = await rpc("ir.model", "search_read", [[["model","=",model]]], {fields:["model","name"], limit:1});
+    const found = await rpc("ir.model", "search_read", [[["model","=",model]]], {
+      fields:["model","name"],
+      limit:1
+    });
     return Array.isArray(found) && found.length > 0;
   }
+
   async function fieldsGet(model) {
     if (state.fields[model]) return state.fields[model];
-    const fields = await rpc(model, "fields_get", [], {attributes:["string","type","required","readonly","relation","store"]});
+    const fields = await rpc(model, "fields_get", [], {
+      attributes:["string","type","required","readonly","relation","store"]
+    });
     state.fields[model] = fields || {};
     return state.fields[model];
   }
+
   function existingFields(fieldMap, wanted) {
     return wanted.filter(f => fieldMap[f]);
   }
+
+  function safeOrderForFields(fieldMap, requestedOrder) {
+    const fallback = fieldMap.id ? "id asc" : "";
+    if (!requestedOrder) return fallback;
+
+    const parts = String(requestedOrder)
+      .split(",")
+      .map(x=>x.trim())
+      .filter(Boolean);
+
+    const safe = [];
+
+    for (const part of parts) {
+      const fname = part.split(/\s+/)[0];
+      if (fieldMap[fname]) safe.push(part);
+    }
+
+    return safe.length ? safe.join(",") : fallback;
+  }
+
   async function safeSearchRead(model, domain, wantedFields, limit=1000, order="id asc") {
     if (!(await modelExists(model))) {
       log(`Model tidak tersedia: ${model}`);
       return [];
     }
+
     const fmap = await fieldsGet(model);
-    const fields = existingFields(fmap, wantedFields);
+
+    let fields = existingFields(fmap, wantedFields);
+    if (!fields.length && fmap.id) fields = ["id"];
+
+    const safeOrder = safeOrderForFields(fmap, order);
+    const kwargs = {fields, limit};
+
+    if (safeOrder) kwargs.order = safeOrder;
+
     try {
-      return await rpc(model, "search_read", [domain], {fields, limit, order});
+      return await rpc(model, "search_read", [domain], kwargs);
     } catch (e) {
-      log(`search_read gagal pada ${model}, coba fallback tanpa field berat.`, e.message);
-      const lightweight = fields.filter(f => !["arch_db","arch_base"].includes(f));
-      return await rpc(model, "search_read", [domain], {fields: lightweight, limit, order});
+      log(`search_read gagal pada ${model}, coba fallback field minimal dan order aman.`, e.message);
+
+      const lightweight = fields.filter(f => !["arch_db","arch_base","url"].includes(f));
+      const minimal = lightweight.length ? lightweight : (fmap.name ? ["id","name"] : ["id"]);
+      const fallbackKwargs = {fields: minimal, limit};
+
+      if (fmap.id) fallbackKwargs.order = "id asc";
+
+      try {
+        return await rpc(model, "search_read", [domain], fallbackKwargs);
+      } catch (e2) {
+        log(`search_read dilewati untuk ${model}.`, e2.message);
+        return [];
+      }
     }
   }
+
   async function scanAll() {
     log("Mulai scan halaman website...");
+
     const pageFields = [
       "id","name","url","key","website_published","is_published","website_indexed","header_visible","footer_visible",
       "website_id","view_id","is_in_menu","is_homepage","visibility","create_date","write_date",
       "website_meta_title","website_meta_description","website_meta_keywords"
     ];
-    const menuFields = ["id","name","url","page_id","parent_id","sequence","website_id","is_visible"];
-    const viewFields = ["id","name","key","type","mode","active","website_id","write_date","arch_db"];
-    const controllerFields = ["id","name","url","website_id","view_id","page_id","write_date"];
+
+    const menuFields = [
+      "id","name","url","page_id","parent_id","sequence","website_id","is_visible"
+    ];
+
+    const viewFields = [
+      "id","name","key","type","mode","active","website_id","write_date","arch_db"
+    ];
+
+    const controllerFields = [
+      "id","name","url","website_url","route","path","website_path",
+      "website_id","view_id","page_id","write_date"
+    ];
 
     state.pages = await safeSearchRead("website.page", [], pageFields, 2000, "url asc");
     state.menus = await safeSearchRead("website.menu", [], menuFields, 2000, "sequence asc");
     state.views = await safeSearchRead("ir.ui.view", [["type","=","qweb"]], viewFields, 2000, "key asc");
-    state.controllers = await safeSearchRead("website.controller.page", [], controllerFields, 1000, "url asc");
+    state.controllers = await safeSearchRead("website.controller.page", [], controllerFields, 1000, "id asc");
+
     detectMissing();
     state.lastScanAt = new Date();
     renderAll();
-    log("Scan selesai.", {pages:state.pages.length, menus:state.menus.length, views:state.views.length, controllers:state.controllers.length, missing:state.missing.length});
+
+    log("Scan selesai.", {
+      pages:state.pages.length,
+      menus:state.menus.length,
+      views:state.views.length,
+      controllers:state.controllers.length,
+      missing:state.missing.length
+    });
   }
+
   function normalizeRoute(x) {
     x = String(x || "").trim();
     if (!x) return "";
     if (!x.startsWith("/")) x = "/" + x;
     return x.replace(/\/+$/,"") || "/";
   }
+
   function targetRoutes() {
     return $("targets").value.split(/\n|,/).map(normalizeRoute).filter(Boolean);
   }
+
+  function routeFromRecord(r) {
+    return normalizeRoute(
+      r && (
+        r.url ||
+        r.website_url ||
+        r.route ||
+        r.path ||
+        r.website_path ||
+        ""
+      )
+    );
+  }
+
   function detectMissing() {
-    const pageUrls = new Set(state.pages.map(p=>normalizeRoute(p.url)));
-    const menuUrls = new Set(state.menus.map(m=>normalizeRoute(m.url)));
-    const controllerUrls = new Set(state.controllers.map(c=>normalizeRoute(c.url)));
+    const pageUrls = new Set(
+      state.pages.map(p=>routeFromRecord(p)).filter(Boolean)
+    );
+
+    const menuUrls = new Set(
+      state.menus.map(m=>routeFromRecord(m)).filter(Boolean)
+    );
+
+    const controllerUrls = new Set(
+      state.controllers.map(c=>routeFromRecord(c)).filter(Boolean)
+    );
+
     state.missing = targetRoutes().map(url => ({
       url,
       exists_page: pageUrls.has(url),
       exists_menu: menuUrls.has(url),
       exists_controller: controllerUrls.has(url),
-      status: pageUrls.has(url) ? "OK" : (controllerUrls.has(url) ? "Controller only" : "Missing website.page")
+      status: pageUrls.has(url)
+        ? "OK"
+        : (controllerUrls.has(url) ? "Controller only" : "Missing website.page")
     })).filter(x => !x.exists_page);
   }
+
   function esc(v) {
     return String(v == null ? "" : v)
-      .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+      .replace(/&/g,"&amp;")
+      .replace(/</g,"&lt;")
+      .replace(/>/g,"&gt;")
+      .replace(/"/g,"&quot;");
   }
+
   function table(rows, cols) {
     if (!rows.length) return '<p class="small">Tidak ada data.</p>';
     return `<table><thead><tr>${cols.map(c=>`<th>${esc(c.label)}</th>`).join("")}</tr></thead><tbody>` +
       rows.map(r=>`<tr>${cols.map(c=>`<td>${c.render ? c.render(r) : esc(r[c.key])}</td>`).join("")}</tr>`).join("") +
       `</tbody></table>`;
   }
+
   function renderAll() {
     $("kpiPages").textContent = state.pages.length;
     $("kpiMenus").textContent = state.menus.length;
     $("kpiViews").textContent = state.views.length;
     $("kpiMissing").textContent = state.missing.length;
+
     $("pagesTable").innerHTML = table(state.pages, [
       {key:"url", label:"URL", render:r=>`<span class="mono">${esc(r.url)}</span>`},
       {key:"name", label:"Name"},
@@ -273,12 +387,14 @@
       {key:"view_id", label:"View", render:r=>esc(Array.isArray(r.view_id) ? r.view_id.join(" / ") : r.view_id)},
       {key:"write_date", label:"Write Date"}
     ]);
+
     $("missingTable").innerHTML = table(state.missing, [
       {key:"url", label:"Missing URL", render:r=>`<span class="mono">${esc(r.url)}</span>`},
       {key:"exists_menu", label:"Menu", render:r=>r.exists_menu ? '<span class="pill warn">menu ada</span>' : '<span class="pill bad">tidak ada</span>'},
       {key:"exists_controller", label:"Controller", render:r=>r.exists_controller ? '<span class="pill warn">controller</span>' : '<span class="pill bad">tidak</span>'},
       {key:"status", label:"Status"}
     ]);
+
     $("menusTable").innerHTML = table(state.menus, [
       {key:"name", label:"Menu"},
       {key:"url", label:"URL", render:r=>`<span class="mono">${esc(r.url)}</span>`},
@@ -286,6 +402,7 @@
       {key:"sequence", label:"Seq"},
       {key:"parent_id", label:"Parent", render:r=>esc(Array.isArray(r.parent_id) ? r.parent_id.join(" / ") : r.parent_id)}
     ]);
+
     $("viewsTable").innerHTML = table(state.views.slice(0,500), [
       {key:"key", label:"Key", render:r=>`<span class="mono">${esc(r.key)}</span>`},
       {key:"name", label:"Name"},
@@ -293,6 +410,7 @@
       {key:"write_date", label:"Write Date"}
     ]);
   }
+
   function makeScanPageArch() {
     return `<t name="Lokalmart Scan" t-name="lokalmart.page_scan">
   <t t-call="website.layout">
@@ -414,17 +532,24 @@
   </t>
 </t>`;
   }
+
   function filterValuesByFields(model, values) {
     const fmap = state.fields[model] || {};
     const out = {};
-    Object.keys(values).forEach(k => { if (fmap[k]) out[k] = values[k]; });
+    Object.keys(values).forEach(k => {
+      if (fmap[k]) out[k] = values[k];
+    });
     return out;
   }
+
   async function upsertScanPage() {
     log("Upsert /scan dimulai...");
+
     await fieldsGet("website.page");
     await fieldsGet("ir.ui.view");
+
     const arch = makeScanPageArch();
+
     const pageVals = filterValuesByFields("website.page", {
       name:"Lokalmart Scan",
       url:"/scan",
@@ -440,7 +565,12 @@
       website_meta_description:"Halaman scanner Lokalmart untuk barcode produk, QR UMKM, Lokal ID, dan katalog lokal.",
       website_meta_keywords:"Lokalmart, scan barcode, QR UMKM, Lokal ID, Cirebon"
     });
-    const pages = await rpc("website.page", "search_read", [[["url","=","/scan"]]], {fields:["id","name","url","view_id"], limit:1});
+
+    const pages = await rpc("website.page", "search_read", [[["url","=","/scan"]]], {
+      fields:["id","name","url","view_id"],
+      limit:1
+    });
+
     if (pages.length) {
       await rpc("website.page", "write", [[pages[0].id], pageVals]);
       log("Page /scan sudah ada dan berhasil diperbarui.", pages[0]);
@@ -450,6 +580,7 @@
         log("Page /scan berhasil dibuat langsung di website.page.", {id:newId});
       } catch (directErr) {
         log("Create langsung website.page gagal. Fallback ke ir.ui.view + website.page/view_id.", directErr.message);
+
         const viewVals = filterValuesByFields("ir.ui.view", {
           name:"Lokalmart Scan",
           type:"qweb",
@@ -459,14 +590,21 @@
           priority:16,
           arch_db:arch
         });
+
         let viewId;
-        const views = await rpc("ir.ui.view", "search_read", [[["key","=","lokalmart.page_scan"]]], {fields:["id","name","key"], limit:1});
+
+        const views = await rpc("ir.ui.view", "search_read", [[["key","=","lokalmart.page_scan"]]], {
+          fields:["id","name","key"],
+          limit:1
+        });
+
         if (views.length) {
           viewId = views[0].id;
           await rpc("ir.ui.view", "write", [[viewId], viewVals]);
         } else {
           viewId = await rpc("ir.ui.view", "create", [viewVals]);
         }
+
         const fallbackVals = filterValuesByFields("website.page", {
           name:"Lokalmart Scan",
           url:"/scan",
@@ -479,19 +617,34 @@
           website_meta_title:"Scan Barcode, QR, dan Lokal ID Lokalmart",
           website_meta_description:"Halaman scanner Lokalmart untuk barcode produk, QR UMKM, Lokal ID, dan katalog lokal."
         });
+
         const pageId = await rpc("website.page", "create", [fallbackVals]);
         log("Page /scan berhasil dibuat dengan fallback view_id.", {pageId, viewId});
       }
     }
+
     await upsertScanMenu();
     await scanAll();
+
     alert("Selesai. Coba buka https://edu-lokalmart.odoo.com/scan");
   }
+
   async function upsertScanMenu() {
     if (!(await modelExists("website.menu"))) return;
+
     await fieldsGet("website.menu");
-    const existing = await rpc("website.menu", "search_read", [[["url","=","/scan"]]], {fields:["id","name","url"], limit:1});
-    const vals = filterValuesByFields("website.menu", {name:"Scan", url:"/scan", sequence:28});
+
+    const existing = await rpc("website.menu", "search_read", [[["url","=","/scan"]]], {
+      fields:["id","name","url"],
+      limit:1
+    });
+
+    const vals = filterValuesByFields("website.menu", {
+      name:"Scan",
+      url:"/scan",
+      sequence:28
+    });
+
     if (existing.length) {
       await rpc("website.menu", "write", [[existing[0].id], vals]);
       log("Menu /scan diperbarui.");
@@ -505,12 +658,6 @@
     }
   }
 
-  function rowValue(row, keys) {
-    for (const k of keys) {
-      if (row[k] !== undefined && row[k] !== null && String(row[k]).trim() !== "") return row[k];
-    }
-    return undefined;
-  }
   function parseMaybeBool(v) {
     if (typeof v !== "string") return v;
     const s = v.trim().toLowerCase();
@@ -518,18 +665,20 @@
     if (["false","no","tidak","0"].includes(s)) return false;
     return v;
   }
+
   function cleanImportRow(row) {
     const out = {};
     Object.entries(row || {}).forEach(([k,v]) => {
       const key = String(k).trim();
       if (!key) return;
-      if (key === "id") return; // External ID milik importer Odoo; tidak dikirim sebagai field RPC.
+      if (key === "id") return;
       if (v === undefined || v === null) return;
       if (typeof v === "string" && v.trim() === "") return;
       out[key] = parseMaybeBool(v);
     });
     return out;
   }
+
   function modelFromSheetName(name) {
     const n = String(name || "").toLowerCase();
     if (n.includes("website.page")) return "website.page";
@@ -537,48 +686,85 @@
     if (n.includes("website.menu")) return "website.menu";
     return "";
   }
+
   async function findExistingForImport(model, values) {
     if (model === "website.page") {
       if (values.url) {
-        const r = await rpc(model, "search_read", [[["url","=",String(values.url)]]], {fields:["id","name","url"], limit:1});
+        const r = await rpc(model, "search_read", [[["url","=",String(values.url)]]], {
+          fields:["id","name","url"],
+          limit:1
+        });
         if (r.length) return r[0].id;
       }
+
       if (values.key) {
-        const r = await rpc(model, "search_read", [[["key","=",String(values.key)]]], {fields:["id","name","key"], limit:1});
+        const r = await rpc(model, "search_read", [[["key","=",String(values.key)]]], {
+          fields:["id","name","key"],
+          limit:1
+        });
         if (r.length) return r[0].id;
       }
     }
+
     if (model === "ir.ui.view") {
       if (values.key) {
-        const r = await rpc(model, "search_read", [[["key","=",String(values.key)]]], {fields:["id","name","key"], limit:1});
+        const r = await rpc(model, "search_read", [[["key","=",String(values.key)]]], {
+          fields:["id","name","key"],
+          limit:1
+        });
         if (r.length) return r[0].id;
       }
+
       if (values.name) {
-        const r = await rpc(model, "search_read", [[["name","=",String(values.name)],["type","=",values.type || "qweb"]]], {fields:["id","name"], limit:1});
+        const r = await rpc(model, "search_read", [[["name","=",String(values.name)],["type","=",values.type || "qweb"]]], {
+          fields:["id","name"],
+          limit:1
+        });
         if (r.length) return r[0].id;
       }
     }
+
     if (model === "website.menu") {
       if (values.url) {
-        const r = await rpc(model, "search_read", [[["url","=",String(values.url)]]], {fields:["id","name","url"], limit:1});
+        const r = await rpc(model, "search_read", [[["url","=",String(values.url)]]], {
+          fields:["id","name","url"],
+          limit:1
+        });
         if (r.length) return r[0].id;
       }
+
       if (values.name) {
-        const r = await rpc(model, "search_read", [[["name","=",String(values.name)]]], {fields:["id","name"], limit:1});
+        const r = await rpc(model, "search_read", [[["name","=",String(values.name)]]], {
+          fields:["id","name"],
+          limit:1
+        });
         if (r.length) return r[0].id;
       }
     }
+
     return null;
   }
+
   async function importRowsToOdoo(model, rows) {
     if (!(await modelExists(model))) throw new Error(`Model tidak tersedia: ${model}`);
+
     await fieldsGet(model);
-    let created = 0, updated = 0, skipped = 0;
+
+    let created = 0;
+    let updated = 0;
+    let skipped = 0;
+
     for (const raw of rows) {
       const values = filterValuesByFields(model, cleanImportRow(raw));
-      if (!Object.keys(values).length) { skipped++; continue; }
+
+      if (!Object.keys(values).length) {
+        skipped++;
+        continue;
+      }
+
       try {
         const existingId = await findExistingForImport(model, values);
+
         if (existingId) {
           await rpc(model, "write", [[existingId], values]);
           updated++;
@@ -590,53 +776,82 @@
         }
       } catch (e) {
         skipped++;
-        log(`Gagal import row ${model}`, {error:e.message, row:raw});
+        log(`Gagal import row ${model}`, {
+          error:e.message,
+          row:raw
+        });
       }
     }
+
     return {model, created, updated, skipped};
   }
+
   async function importFileToOdoo(file) {
     if (!file) return;
+
     log("Mulai import file ke Odoo...", file.name);
     await test();
+
     const lower = file.name.toLowerCase();
     let groups = [];
+
     if (lower.endsWith(".json")) {
       const txt = await file.text();
       const data = JSON.parse(txt);
+
       if (Array.isArray(data)) {
         const model = data[0]?.model || "website.page";
         groups.push({model, rows:data});
       } else if (data && typeof data === "object") {
-        Object.entries(data).forEach(([model, rows]) => { if (Array.isArray(rows)) groups.push({model, rows}); });
+        Object.entries(data).forEach(([model, rows]) => {
+          if (Array.isArray(rows)) groups.push({model, rows});
+        });
       }
     } else {
       const buf = await file.arrayBuffer();
       const wb = XLSX.read(buf, {type:"array"});
+
       for (const sheetName of wb.SheetNames) {
         const model = modelFromSheetName(sheetName);
         if (!model) continue;
+
         const rows = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], {defval:""});
-        const importRows = rows.filter(r => Object.values(r).some(v => String(v || "").trim() !== ""));
+        const importRows = rows.filter(r =>
+          Object.values(r).some(v => String(v || "").trim() !== "")
+        );
+
         if (importRows.length) groups.push({model, rows:importRows});
       }
     }
+
     if (!groups.length) {
       alert("File terbaca, tetapi tidak ada sheet import yang dikenali. Nama sheet harus memuat website.page, ir.ui.view, atau website.menu.");
       return;
     }
-    // Urutan penting: view dulu, page, lalu menu.
-    const order = {"ir.ui.view":1,"website.page":2,"website.menu":3};
+
+    const order = {
+      "ir.ui.view":1,
+      "website.page":2,
+      "website.menu":3
+    };
+
     groups.sort((a,b)=>(order[a.model]||9)-(order[b.model]||9));
+
     const summary = [];
-    for (const g of groups) summary.push(await importRowsToOdoo(g.model, g.rows));
+
+    for (const g of groups) {
+      summary.push(await importRowsToOdoo(g.model, g.rows));
+    }
+
     log("Import selesai.", summary);
     await scanAll();
+
     alert("Import selesai. Lihat tab Log untuk detail create/update/skipped.");
   }
 
   function exportXlsx() {
     const wb = XLSX.utils.book_new();
+
     const meta = [
       ["Generated At", new Date().toISOString()],
       ["Odoo URL", $("baseUrl").value],
@@ -646,11 +861,18 @@
       ["Views", state.views.length],
       ["Missing", state.missing.length]
     ];
+
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(meta), "00_README");
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(state.pages), "10_website.page_SCAN");
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(state.menus), "20_website.menu_SCAN");
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(state.views.map(v=>({...v, arch_db:v.arch_db ? String(v.arch_db).slice(0,32000) : ""}))), "30_ir.ui.view_SCAN");
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(
+      state.views.map(v=>({
+        ...v,
+        arch_db:v.arch_db ? String(v.arch_db).slice(0,32000) : ""
+      }))
+    ), "30_ir.ui.view_SCAN");
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(state.missing), "40_MISSING_PAGES");
+
     const importRows = [{
       id:"lokalmart_page_scan",
       name:"Lokalmart Scan",
@@ -667,6 +889,7 @@
       website_meta_description:"Halaman scanner Lokalmart untuk barcode produk, QR UMKM, Lokal ID, dan katalog lokal.",
       website_meta_keywords:"Lokalmart, scan barcode, QR UMKM, Lokal ID, Cirebon"
     }];
+
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(importRows), "50_IMPORT_website.page");
     XLSX.writeFile(wb, "lokalmart_odoo_pages_scan_export.xlsx");
   }
@@ -675,15 +898,46 @@
     btn.addEventListener("click",()=>{
       document.querySelectorAll(".tab").forEach(b=>b.classList.remove("active"));
       btn.classList.add("active");
-      ["pages","missing","menus","views","log"].forEach(t=>$("tab-"+t).classList.toggle("hidden", t!==btn.dataset.tab));
+
+      ["pages","missing","menus","views","log"].forEach(t=>{
+        $("tab-"+t).classList.toggle("hidden", t!==btn.dataset.tab);
+      });
     });
   });
-  $("btnTest").addEventListener("click",()=>test().catch(e=>{log("Test gagal.",e.message);alert(e.message);}));
-  $("btnScan").addEventListener("click",()=>scanAll().catch(e=>{log("Scan gagal.",e.message);alert(e.message);}));
-  $("btnUpsertScan").addEventListener("click",()=>upsertScanPage().catch(e=>{log("Upsert gagal.",e.message);alert(e.message);}));
-  $("btnExport").addEventListener("click",exportXlsx);
-  $("btnChooseImport").addEventListener("click",()=>$("importFile").click());
-  $("importFile").addEventListener("change",(e)=>importFileToOdoo(e.target.files[0]).catch(err=>{log("Import gagal.",err.message);alert(err.message);}));
+
+  $("btnTest").addEventListener("click",()=>{
+    test().catch(e=>{
+      log("Test gagal.", e.message);
+      alert(e.message);
+    });
+  });
+
+  $("btnScan").addEventListener("click",()=>{
+    scanAll().catch(e=>{
+      log("Scan gagal.", e.message);
+      alert(e.message);
+    });
+  });
+
+  $("btnUpsertScan").addEventListener("click",()=>{
+    upsertScanPage().catch(e=>{
+      log("Upsert gagal.", e.message);
+      alert(e.message);
+    });
+  });
+
+  $("btnExport").addEventListener("click", exportXlsx);
+
+  $("btnChooseImport").addEventListener("click",()=>{
+    $("importFile").click();
+  });
+
+  $("importFile").addEventListener("change",(e)=>{
+    importFileToOdoo(e.target.files[0]).catch(err=>{
+      log("Import gagal.", err.message);
+      alert(err.message);
+    });
+  });
 })();
 </script>
 </body>
