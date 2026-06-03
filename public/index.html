@@ -3,421 +3,67 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>Lokalmart Universal Odoo XLSX Importer V6.1</title>
-
+  <title>Lokalmart Universal Importer + Odoo Autopsy V7</title>
   <script>
     window.__xlsxReady = new Promise(function(resolve, reject){
-      function loadScript(src, onError){
+      function load(src, fail){
         var s = document.createElement("script");
         s.src = src;
         s.async = true;
-        s.onload = function(){
-          if (window.XLSX) {
-            resolve(window.XLSX);
-          } else if (onError) {
-            onError();
-          } else {
-            reject(new Error("Library XLSX gagal dimuat."));
-          }
-        };
-        s.onerror = function(){
-          if (onError) {
-            onError();
-          } else {
-            reject(new Error("Library XLSX gagal dimuat dari semua CDN."));
-          }
-        };
+        s.onload = function(){ window.XLSX ? resolve(window.XLSX) : (fail ? fail() : reject(new Error("Library XLSX gagal dimuat."))); };
+        s.onerror = function(){ fail ? fail() : reject(new Error("Library XLSX gagal dimuat dari semua CDN.")); };
         document.head.appendChild(s);
       }
-
-      loadScript(
-        "https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js",
-        function(){
-          loadScript(
-            "https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js",
-            function(){
-              loadScript(
-                "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"
-              );
-            }
-          );
-        }
-      );
+      load("https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js", function(){
+        load("https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js", function(){
+          load("https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js");
+        });
+      });
     });
-
     async function getXLSX(){
-      if (window.XLSX) return window.XLSX;
-      if (window.__xlsxReady) return await window.__xlsxReady;
+      if(window.XLSX) return window.XLSX;
+      if(window.__xlsxReady) return await window.__xlsxReady;
       throw new Error("XLSX belum tersedia. Refresh halaman lalu coba lagi.");
     }
   </script>
-
   <style>
-    :root{
-      --bg:#070914;
-      --card:rgba(255,255,255,.075);
-      --card2:rgba(255,255,255,.105);
-      --line:rgba(255,255,255,.14);
-      --text:#f8fbff;
-      --muted:#b9c3dc;
-      --green:#30e39a;
-      --orange:#ff9f43;
-      --blue:#66d9ff;
-      --purple:#b987ff;
-      --red:#ff5f6d;
-      --shadow:0 22px 78px rgba(0,0,0,.44);
-    }
-
-    *{box-sizing:border-box}
-
-    body{
-      margin:0;
-      min-height:100vh;
-      color:var(--text);
-      font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;
-      background:
-        radial-gradient(circle at 12% 8%,rgba(255,159,67,.28),transparent 32%),
-        radial-gradient(circle at 88% 16%,rgba(185,135,255,.24),transparent 30%),
-        radial-gradient(circle at 50% 95%,rgba(48,227,154,.16),transparent 32%),
-        linear-gradient(135deg,#070914,#111827 58%,#180f26);
-    }
-
-    .wrap{
-      max-width:1280px;
-      margin:0 auto;
-      padding:22px;
-    }
-
-    .hero{
-      display:grid;
-      grid-template-columns:1.05fr .95fr;
-      gap:16px;
-      margin-bottom:16px;
-    }
-
-    .card{
-      position:relative;
-      overflow:hidden;
-      border:1px solid var(--line);
-      border-radius:28px;
-      background:linear-gradient(180deg,rgba(255,255,255,.105),rgba(255,255,255,.055));
-      box-shadow:var(--shadow);
-      backdrop-filter:blur(18px);
-      padding:20px;
-    }
-
-    .card:before{
-      content:"";
-      pointer-events:none;
-      position:absolute;
-      inset:-1px;
-      border-radius:28px;
-      opacity:.36;
-      padding:1px;
-      background:linear-gradient(120deg,rgba(255,159,67,.35),transparent 28%,rgba(48,227,154,.20),transparent 68%,rgba(185,135,255,.30));
-      -webkit-mask:linear-gradient(#000,#000) content-box,linear-gradient(#000,#000);
-      -webkit-mask-composite:xor;
-      mask-composite:exclude;
-    }
-
-    .badge{
-      display:inline-flex;
-      gap:9px;
-      align-items:center;
-      border:1px solid var(--line);
-      background:rgba(255,255,255,.08);
-      border-radius:999px;
-      padding:8px 12px;
-      font-weight:900;
-      color:#e8efff;
-      font-size:13px;
-      margin-bottom:14px;
-    }
-
-    .dot{
-      width:10px;
-      height:10px;
-      background:var(--green);
-      border-radius:99px;
-      box-shadow:0 0 18px var(--green);
-    }
-
-    h1{
-      margin:0 0 14px;
-      font-size:clamp(32px,5vw,58px);
-      line-height:.95;
-      letter-spacing:-.055em;
-    }
-
-    h2{
-      margin:0 0 10px;
-      font-size:21px;
-    }
-
-    p{
-      margin:0 0 14px;
-      color:var(--muted);
-      line-height:1.55;
-    }
-
-    label{
-      display:block;
-      font-size:12px;
-      color:#dce5fb;
-      font-weight:900;
-      letter-spacing:.06em;
-      text-transform:uppercase;
-    }
-
-    input,textarea,select{
-      width:100%;
-      margin-top:6px;
-      border:1px solid var(--line);
-      border-radius:14px;
-      background:rgba(0,0,0,.26);
-      color:var(--text);
-      padding:12px 13px;
-      outline:none;
-      font:inherit;
-    }
-
-    textarea{
-      min-height:96px;
-      resize:vertical;
-    }
-
-    input:focus,textarea:focus,select:focus{
-      border-color:rgba(48,227,154,.62);
-      box-shadow:0 0 0 4px rgba(48,227,154,.12);
-    }
-
-    .grid2{
-      display:grid;
-      grid-template-columns:1fr 1fr;
-      gap:12px;
-    }
-
-    .grid3{
-      display:grid;
-      grid-template-columns:repeat(3,1fr);
-      gap:12px;
-    }
-
-    .grid4{
-      display:grid;
-      grid-template-columns:repeat(4,1fr);
-      gap:12px;
-    }
-
-    .btns{
-      display:flex;
-      flex-wrap:wrap;
-      gap:10px;
-      margin-top:14px;
-    }
-
-    button,.button{
-      border:0;
-      border-radius:999px;
-      padding:12px 16px;
-      cursor:pointer;
-      font-weight:950;
-      color:#07111c;
-      background:#fff;
-      box-shadow:0 12px 34px rgba(0,0,0,.26);
-      transition:.18s transform,.18s opacity;
-    }
-
-    button:hover{transform:translateY(-1px)}
-    button:disabled{opacity:.42;cursor:not-allowed;transform:none}
-
-    .primary{background:linear-gradient(135deg,var(--green),#d4ff77)}
-    .orange{background:linear-gradient(135deg,var(--orange),#ffd166)}
-    .blue{background:linear-gradient(135deg,var(--blue),#d4f8ff)}
-    .purple{background:linear-gradient(135deg,var(--purple),#ff8edb);color:#17091f}
-    .danger{background:linear-gradient(135deg,var(--red),#ffb199);color:#250508}
-    .ghost{background:rgba(255,255,255,.08);color:#fff;border:1px solid var(--line);box-shadow:none}
-
-    .kpi{
-      border:1px solid var(--line);
-      background:rgba(255,255,255,.06);
-      border-radius:22px;
-      padding:15px;
-    }
-
-    .kpi b{
-      display:block;
-      font-size:29px;
-      letter-spacing:-.04em;
-    }
-
-    .kpi span{
-      display:block;
-      color:var(--muted);
-      font-size:11px;
-      font-weight:900;
-      text-transform:uppercase;
-      letter-spacing:.07em;
-    }
-
-    .tabs{
-      display:flex;
-      gap:8px;
-      flex-wrap:wrap;
-      margin-bottom:12px;
-    }
-
-    .tab{
-      background:rgba(255,255,255,.08);
-      color:#eaf0ff;
-      border:1px solid var(--line);
-      box-shadow:none;
-    }
-
-    .tab.active{
-      background:#fff;
-      color:#07111c;
-    }
-
-    table{
-      width:100%;
-      border-collapse:separate;
-      border-spacing:0 8px;
-      font-size:13px;
-    }
-
-    th{
-      text-align:left;
-      color:#dce5fb;
-      font-size:11px;
-      text-transform:uppercase;
-      letter-spacing:.06em;
-      padding:0 10px;
-    }
-
-    td{
-      background:rgba(255,255,255,.064);
-      border-top:1px solid var(--line);
-      border-bottom:1px solid var(--line);
-      padding:10px;
-      vertical-align:top;
-      color:#f5f8ff;
-    }
-
-    td:first-child{
-      border-left:1px solid var(--line);
-      border-radius:14px 0 0 14px;
-    }
-
-    td:last-child{
-      border-right:1px solid var(--line);
-      border-radius:0 14px 14px 0;
-    }
-
-    .pill{
-      display:inline-flex;
-      align-items:center;
-      border-radius:999px;
-      padding:4px 8px;
-      border:1px solid var(--line);
-      background:rgba(255,255,255,.08);
-      font-size:11px;
-      font-weight:950;
-    }
-
-    .ok{color:#8dffcf}
-    .warn{color:#ffd166}
-    .bad{color:#ff9da7}
-    .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
-
-    pre{
-      margin:0;
-      white-space:pre-wrap;
-      word-break:break-word;
-      background:rgba(0,0,0,.28);
-      border:1px solid var(--line);
-      border-radius:18px;
-      padding:14px;
-      color:#dfe7ff;
-      max-height:420px;
-      overflow:auto;
-    }
-
-    .small{
-      font-size:12px;
-      color:var(--muted);
-    }
-
-    .hidden{display:none!important}
-
-    .drop{
-      border:1px dashed rgba(255,255,255,.28);
-      border-radius:22px;
-      background:rgba(255,255,255,.055);
-      padding:16px;
-      text-align:center;
-      color:#dfe7ff;
-    }
-
-    .drop strong{display:block;font-size:16px;margin-bottom:4px}
-    .drop.drag{border-color:var(--green);box-shadow:0 0 0 4px rgba(48,227,154,.12)}
-
-    @media(max-width:960px){
-      .hero,.grid2{grid-template-columns:1fr}
-      .grid3,.grid4{grid-template-columns:1fr 1fr}
-      .wrap{padding:14px}
-      .card{border-radius:22px;padding:16px}
-    }
-
-    @media(max-width:620px){
-      .grid3,.grid4{grid-template-columns:1fr}
-      .btns button{width:100%}
-    }
+    :root{--bg:#070914;--line:rgba(255,255,255,.14);--text:#f8fbff;--muted:#b9c3dc;--green:#30e39a;--orange:#ff9f43;--blue:#66d9ff;--purple:#b987ff;--red:#ff5f6d;--shadow:0 22px 78px rgba(0,0,0,.44)}
+    *{box-sizing:border-box}body{margin:0;min-height:100vh;color:var(--text);font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;background:radial-gradient(circle at 12% 8%,rgba(255,159,67,.28),transparent 32%),radial-gradient(circle at 88% 16%,rgba(185,135,255,.24),transparent 30%),radial-gradient(circle at 50% 95%,rgba(48,227,154,.16),transparent 32%),linear-gradient(135deg,#070914,#111827 58%,#180f26)}
+    .wrap{max-width:1280px;margin:0 auto;padding:22px}.hero{display:grid;grid-template-columns:1.05fr .95fr;gap:16px;margin-bottom:16px}.card{position:relative;overflow:hidden;border:1px solid var(--line);border-radius:28px;background:linear-gradient(180deg,rgba(255,255,255,.105),rgba(255,255,255,.055));box-shadow:var(--shadow);backdrop-filter:blur(18px);padding:20px}.badge{display:inline-flex;gap:9px;align-items:center;border:1px solid var(--line);background:rgba(255,255,255,.08);border-radius:999px;padding:8px 12px;font-weight:900;color:#e8efff;font-size:13px;margin-bottom:14px}.dot{width:10px;height:10px;background:var(--green);border-radius:99px;box-shadow:0 0 18px var(--green)}
+    h1{margin:0 0 14px;font-size:clamp(32px,5vw,58px);line-height:.95;letter-spacing:-.055em}h2{margin:0 0 10px;font-size:21px}p{margin:0 0 14px;color:var(--muted);line-height:1.55}label{display:block;font-size:12px;color:#dce5fb;font-weight:900;letter-spacing:.06em;text-transform:uppercase}input,textarea,select{width:100%;margin-top:6px;border:1px solid var(--line);border-radius:14px;background:rgba(0,0,0,.26);color:var(--text);padding:12px 13px;outline:none;font:inherit}textarea{min-height:96px;resize:vertical}input:focus,textarea:focus,select:focus{border-color:rgba(48,227,154,.62);box-shadow:0 0 0 4px rgba(48,227,154,.12)}
+    .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}.btns{display:flex;flex-wrap:wrap;gap:10px;margin-top:14px}button{border:0;border-radius:999px;padding:12px 16px;cursor:pointer;font-weight:950;color:#07111c;background:#fff;box-shadow:0 12px 34px rgba(0,0,0,.26);transition:.18s transform,.18s opacity}button:hover{transform:translateY(-1px)}button:disabled{opacity:.42;cursor:not-allowed;transform:none}.primary{background:linear-gradient(135deg,var(--green),#d4ff77)}.orange{background:linear-gradient(135deg,var(--orange),#ffd166)}.blue{background:linear-gradient(135deg,var(--blue),#d4f8ff)}.purple{background:linear-gradient(135deg,var(--purple),#ff8edb);color:#17091f}.danger{background:linear-gradient(135deg,var(--red),#ffb199);color:#250508}.ghost{background:rgba(255,255,255,.08);color:#fff;border:1px solid var(--line);box-shadow:none}
+    .kpi{border:1px solid var(--line);background:rgba(255,255,255,.06);border-radius:22px;padding:15px}.kpi b{display:block;font-size:29px;letter-spacing:-.04em}.kpi span{display:block;color:var(--muted);font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.07em}.tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}.tab{background:rgba(255,255,255,.08);color:#eaf0ff;border:1px solid var(--line);box-shadow:none}.tab.active{background:#fff;color:#07111c}
+    table{width:100%;border-collapse:separate;border-spacing:0 8px;font-size:13px}th{text-align:left;color:#dce5fb;font-size:11px;text-transform:uppercase;letter-spacing:.06em;padding:0 10px}td{background:rgba(255,255,255,.064);border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:10px;vertical-align:top;color:#f5f8ff}td:first-child{border-left:1px solid var(--line);border-radius:14px 0 0 14px}td:last-child{border-right:1px solid var(--line);border-radius:0 14px 14px 0}.pill{display:inline-flex;align-items:center;border-radius:999px;padding:4px 8px;border:1px solid var(--line);background:rgba(255,255,255,.08);font-size:11px;font-weight:950}.ok{color:#8dffcf}.warn{color:#ffd166}.bad{color:#ff9da7}.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}pre{margin:0;white-space:pre-wrap;word-break:break-word;background:rgba(0,0,0,.28);border:1px solid var(--line);border-radius:18px;padding:14px;color:#dfe7ff;max-height:440px;overflow:auto}.small{font-size:12px;color:var(--muted)}.hidden{display:none!important}.drop{border:1px dashed rgba(255,255,255,.28);border-radius:22px;background:rgba(255,255,255,.055);padding:16px;text-align:center;color:#dfe7ff}.drop strong{display:block;font-size:16px;margin-bottom:4px}.drop.drag{border-color:var(--green);box-shadow:0 0 0 4px rgba(48,227,154,.12)}
+    @media(max-width:960px){.hero,.grid2{grid-template-columns:1fr}.grid4{grid-template-columns:1fr 1fr}.wrap{padding:14px}.card{border-radius:22px;padding:16px}}@media(max-width:620px){.grid4{grid-template-columns:1fr}.btns button{width:100%}}
   </style>
 </head>
-
 <body>
 <div class="wrap">
-
   <section class="hero">
     <div class="card">
-      <div class="badge"><span class="dot"></span> Lokalmart Universal Odoo XLSX Importer V6.1</div>
-      <h1>Satu importer untuk pages, custom fields, project, produk, course, dan data Odoo Lokalmart.</h1>
-      <p>
-        Format XLSX dibuat universal: nama sheet adalah nama model Odoo, atau isi kolom <span class="mono">_model</span>.
-        Importer akan membaca fields asli dari Odoo, memvalidasi kolom, resolve relasi many2one/many2many, lalu create/update otomatis.
-      </p>
-
+      <div class="badge"><span class="dot"></span> Lokalmart Universal Importer + Odoo Autopsy V7</div>
+      <h1>Import semua XLSX Lokalmart, lalu export autopsy penuh database Odoo.</h1>
+      <p>V7 mempertahankan fitur import V6 dan menambah tombol <b>Export Full Autopsy XLSX</b> untuk membaca pages, menu, QWeb, produk, partner, project, field, link internal, dan issue otomatis.</p>
       <div class="btns">
         <button class="primary" id="btnTest">Test koneksi</button>
         <button class="blue" id="btnScanModels">Scan Models & Fields</button>
         <button class="orange" id="btnChooseImport">Pilih XLSX/JSON</button>
         <button class="purple" id="btnImport">Import ke Odoo</button>
         <button class="ghost" id="btnDryRun">Dry Run / Validasi</button>
-        <button class="danger" id="btnExportTemplate">Export Template</button>
+        <button class="danger" id="btnAudit">Export Full Autopsy XLSX</button>
+        <button class="ghost" id="btnExportTemplate">Export Template</button>
         <input id="importFile" class="hidden" type="file" accept=".xlsx,.xls,.json,application/json"/>
       </div>
     </div>
-
     <div class="card">
       <h2>Koneksi Odoo</h2>
       <div class="grid2">
-        <label>Odoo URL
-          <input id="baseUrl" value="https://edu-lokalmart.odoo.com" placeholder="https://edu-lokalmart.odoo.com"/>
-        </label>
-        <label>Database
-          <input id="db" placeholder="Nama database Odoo"/>
-        </label>
-        <label>Login Admin
-          <input id="login" placeholder="Email/login admin"/>
-        </label>
-        <label>Password / API Key
-          <input id="password" type="password" placeholder="Password atau API key"/>
-        </label>
+        <label>Odoo URL<input id="baseUrl" value="https://edu-lokalmart.odoo.com" placeholder="https://edu-lokalmart.odoo.com"/></label>
+        <label>Database<input id="db" placeholder="Nama database Odoo"/></label>
+        <label>Login Admin<input id="login" placeholder="Email/login admin"/></label>
+        <label>Password / API Key<input id="password" type="password" placeholder="Password atau API key"/></label>
       </div>
-      <p class="small" style="margin-top:10px">
-        Disarankan memakai API key admin. Credential tidak disimpan di browser maupun server Vercel.
-      </p>
+      <p class="small" style="margin-top:10px">Credential tidak disimpan. Untuk audit pilot, data yang dibaca akan diekspor ke file XLSX di komputer Anda.</p>
     </div>
   </section>
 
@@ -431,37 +77,31 @@
   <section class="grid2" style="margin-bottom:16px">
     <div class="card">
       <h2>Upload XLSX / JSON</h2>
-      <div id="drop" class="drop">
-        <strong>Tarik file ke sini</strong>
-        <span>atau klik tombol “Pilih XLSX/JSON”.</span>
-      </div>
+      <div id="drop" class="drop"><strong>Tarik file ke sini</strong><span>atau klik tombol “Pilih XLSX/JSON”.</span></div>
       <p class="small" id="fileInfo" style="margin-top:10px">Belum ada file dipilih.</p>
     </div>
-
     <div class="card">
       <h2>Standar sheet universal</h2>
-      <p class="small">
-        Nama sheet sebaiknya langsung nama model, misalnya <span class="mono">project.task</span>.
-        Kolom khusus:
-      </p>
-      <pre>_model        opsional jika nama sheet bukan nama model
-_action       upsert / create / update / delete / skip
-_external_id  external id stabil, contoh lokalmart_importer.scan_page
-_match        field pencari, contoh name,project_id
+      <pre>Nama sheet = nama model Odoo, contoh: project.task
 
-Contoh relasi:
-project_id       boleh angka ID, nama, atau external id
-project_id/id    paksa sebagai ID Odoo
-project_id/name  paksa cari berdasarkan nama
-project_id/xmlid paksa cari external id
-tag_ids          many2many, pisahkan dengan koma</pre>
+Kolom khusus:
+_action       upsert / create / update / delete / skip
+_external_id  external id stabil, contoh lokalmart_importer.page_scan
+_match        field pencari, contoh name,project_id
+_model        opsional bila sheet bukan nama model
+
+Relasi:
+project_id       nama/id/xmlid otomatis
+project_id/id    paksa ID
+project_id/name  paksa nama
+tag_ids          many2many dipisah koma</pre>
     </div>
   </section>
 
-  <section class="card" style="margin-bottom:16px">
-    <h2>Model scanner</h2>
-    <p>Daftar model yang sering dipakai Lokalmart. Bisa ditambah kapan saja.</p>
-    <textarea id="modelList">website.page
+  <section class="grid2" style="margin-bottom:16px">
+    <div class="card">
+      <h2>Model scanner/importer</h2>
+      <textarea id="modelList">website.page
 website.menu
 ir.ui.view
 ir.model
@@ -481,6 +121,38 @@ slide.slide
 knowledge.article
 calendar.event
 mail.activity.type</textarea>
+    </div>
+    <div class="card">
+      <h2>Autopsy database Odoo</h2>
+      <p>Model di bawah ini akan diekspor ke XLSX lengkap bersama issue otomatis dan link checker.</p>
+      <textarea id="auditModelList">website.page
+website.menu
+ir.ui.view
+website
+website.redirect
+product.template
+product.product
+product.category
+res.partner
+crm.lead
+project.project
+project.task
+project.milestone
+account.analytic.account
+account.analytic.line
+slide.channel
+slide.slide
+knowledge.article
+calendar.event
+mail.activity.type
+ir.model
+ir.model.fields
+ir.model.data</textarea>
+      <div class="grid2" style="margin-top:10px">
+        <label>Limit per model<input id="auditLimit" type="number" value="1500" min="50" max="5000"/></label>
+        <label>Opsi audit<select id="auditMode"><option value="normal">Normal + HTML/QWeb</option><option value="light">Ringan tanpa arch/html</option><option value="allfields">Semua field yang bisa dibaca</option></select></label>
+      </div>
+    </div>
   </section>
 
   <section class="card">
@@ -491,1197 +163,68 @@ mail.activity.type</textarea>
       <button class="tab" data-tab="result">Result</button>
       <button class="tab" data-tab="log">Log</button>
     </div>
-
     <div id="tab-preview"><div id="previewTable"></div></div>
     <div id="tab-models" class="hidden"><div id="modelsTable"></div></div>
     <div id="tab-fields" class="hidden"><div id="fieldsTable"></div></div>
     <div id="tab-result" class="hidden"><div id="resultTable"></div></div>
     <div id="tab-log" class="hidden"><pre id="log"></pre></div>
   </section>
-
 </div>
 
 <script>
 (function(){
-  const state = {
-    uid:null,
-    workbook:null,
-    fileName:"",
-    groups:[],
-    modelFields:{},
-    modelInfo:{},
-    scannedModels:[],
-    scannedFields:[],
-    results:[],
-    warnings:[]
-  };
-
-  const $ = id => document.getElementById(id);
-
-  function log(msg, data){
-    const line = `[${new Date().toLocaleTimeString()}] ${msg}` +
-      (data === undefined ? "" : "\n" + (typeof data === "string" ? data : JSON.stringify(data,null,2)));
-    $("log").textContent = line + "\n\n" + $("log").textContent;
-  }
-
-  function warn(msg, data){
-    state.warnings.push({time:new Date().toISOString(), msg, data});
-    log("WARNING: " + msg, data);
-    renderKpis();
-  }
-
-  function getCreds(){
-    return {
-      baseUrl:$("baseUrl").value.trim().replace(/\/+$/,""),
-      db:$("db").value.trim(),
-      login:$("login").value.trim(),
-      password:$("password").value
-    };
-  }
-
-  async function rpc(model, method, args=[], kwargs={}){
-    const body = {
-      ...getCreds(),
-      uid:state.uid,
-      model,
-      method,
-      args,
-      kwargs
-    };
-
-    const res = await fetch("/api/odoo", {
-      method:"POST",
-      headers:{"Content-Type":"application/json"},
-      body:JSON.stringify(body)
-    });
-
-    const payload = await res.json().catch(()=>({
-      ok:false,
-      error:"Invalid JSON response from Vercel function"
-    }));
-
-    if(!payload.ok) throw new Error(payload.error || "RPC failed");
-
-    if(payload.uid) state.uid = payload.uid;
-
-    return payload.result;
-  }
-
-  async function testConnection(){
-    const res = await fetch("/api/odoo", {
-      method:"POST",
-      headers:{"Content-Type":"application/json"},
-      body:JSON.stringify(getCreds())
-    });
-
-    const payload = await res.json();
-
-    if(!payload.ok) throw new Error(payload.error || "Authentication failed");
-
-    state.uid = payload.uid;
-    log("Koneksi Odoo berhasil.", {uid:state.uid});
-    alert("Koneksi berhasil.");
-  }
-
-  function esc(v){
-    return String(v == null ? "" : v)
-      .replace(/&/g,"&amp;")
-      .replace(/</g,"&lt;")
-      .replace(/>/g,"&gt;")
-      .replace(/"/g,"&quot;");
-  }
-
-  function table(rows, cols){
-    if(!rows || !rows.length) return '<p class="small">Belum ada data.</p>';
-
-    return `<table><thead><tr>${cols.map(c=>`<th>${esc(c.label)}</th>`).join("")}</tr></thead><tbody>` +
-      rows.map(r=>`<tr>${cols.map(c=>`<td>${c.render ? c.render(r) : esc(r[c.key])}</td>`).join("")}</tr>`).join("") +
-      `</tbody></table>`;
-  }
-
-  function renderKpis(){
-    $("kpiSheets").textContent = state.groups.length;
-    $("kpiRows").textContent = state.groups.reduce((n,g)=>n + g.rows.length,0);
-    $("kpiModels").textContent = new Set(state.groups.map(g=>g.model).filter(Boolean)).size;
-    $("kpiErrors").textContent = state.warnings.length;
-  }
-
-  function renderPreview(){
-    const rows = [];
-
-    state.groups.forEach(g=>{
-      rows.push({
-        sheet:g.sheet,
-        model:g.model,
-        rows:g.rows.length,
-        columns:g.headers.join(", ").slice(0,260)
-      });
-    });
-
-    $("previewTable").innerHTML = table(rows, [
-      {key:"sheet", label:"Sheet"},
-      {key:"model", label:"Model", render:r=>`<span class="mono">${esc(r.model)}</span>`},
-      {key:"rows", label:"Rows"},
-      {key:"columns", label:"Columns"}
-    ]);
-  }
-
-  function renderModels(){
-    $("modelsTable").innerHTML = table(state.scannedModels, [
-      {key:"model", label:"Model", render:r=>`<span class="mono">${esc(r.model)}</span>`},
-      {key:"name", label:"Name"},
-      {key:"status", label:"Status", render:r=>{
-        if(r.status === "OK") return '<span class="pill ok">OK</span>';
-        return '<span class="pill bad">Missing / Error</span>';
-      }},
-      {key:"field_count", label:"Fields"},
-      {key:"error", label:"Error"}
-    ]);
-  }
-
-  function renderFields(){
-    $("fieldsTable").innerHTML = table(state.scannedFields.slice(0,800), [
-      {key:"model", label:"Model", render:r=>`<span class="mono">${esc(r.model)}</span>`},
-      {key:"name", label:"Field", render:r=>`<span class="mono">${esc(r.name)}</span>`},
-      {key:"string", label:"Label"},
-      {key:"type", label:"Type"},
-      {key:"relation", label:"Relation", render:r=>`<span class="mono">${esc(r.relation)}</span>`},
-      {key:"required", label:"Req"},
-      {key:"readonly", label:"Readonly"}
-    ]);
-  }
-
-  function renderResults(){
-    $("resultTable").innerHTML = table(state.results.slice(0,1000), [
-      {key:"model", label:"Model", render:r=>`<span class="mono">${esc(r.model)}</span>`},
-      {key:"action", label:"Action"},
-      {key:"status", label:"Status", render:r=>{
-        if(r.status === "created") return '<span class="pill ok">created</span>';
-        if(r.status === "updated") return '<span class="pill ok">updated</span>';
-        if(r.status === "deleted") return '<span class="pill warn">deleted</span>';
-        if(r.status === "dry_run") return '<span class="pill warn">dry run</span>';
-        if(r.status === "skipped") return '<span class="pill warn">skipped</span>';
-        return '<span class="pill bad">error</span>';
-      }},
-      {key:"id", label:"Odoo ID"},
-      {key:"external_id", label:"External ID"},
-      {key:"message", label:"Message"}
-    ]);
-  }
-
-  function renderAll(){
-    renderKpis();
-    renderPreview();
-    renderModels();
-    renderFields();
-    renderResults();
-  }
-
-  function normalizeHeader(h){
-    const raw = String(h || "").trim();
-
-    const map = {
-      "External ID":"_external_id",
-      "external_id":"_external_id",
-      "xml_id":"_external_id",
-      "XML ID":"_external_id",
-      "Odoo ID":"_odoo_id",
-      "odoo_id":"_odoo_id",
-      "Action":"_action",
-      "action":"_action",
-      "Model":"_model",
-      "_model":"_model",
-      "_action":"_action",
-      "_external_id":"_external_id",
-      "_match":"_match",
-      "_odoo_id":"_odoo_id",
-      "Match":"_match",
-      "match":"_match"
-    };
-
-    return map[raw] || raw;
-  }
-
-  function sheetNameToModel(sheetName){
-    const s = String(sheetName || "").trim();
-
-    const exact = s.match(/^[a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)+$/i);
-    if(exact) return s;
-
-    const found = s.match(/[a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)+/ig);
-    if(found && found.length) return found[found.length - 1];
-
-    return "";
-  }
-
-  function isEmptyValue(v){
-    return v === undefined || v === null || (typeof v === "string" && v.trim() === "");
-  }
-
-  function cleanCell(v){
-    if(v === undefined || v === null) return "";
-    if(typeof v === "string") return v.trim();
-    return v;
-  }
-
-  function parseBoolean(v){
-    if(typeof v === "boolean") return v;
-    if(typeof v === "number") return v !== 0;
-
-    const s = String(v || "").trim().toLowerCase();
-
-    if(["true","yes","ya","y","1","benar"].includes(s)) return true;
-    if(["false","no","tidak","n","0","salah"].includes(s)) return false;
-
-    return Boolean(v);
-  }
-
-  function parseMaybeJson(v){
-    if(typeof v !== "string") return v;
-
-    const s = v.trim();
-
-    if(!s) return v;
-
-    if((s.startsWith("{") && s.endsWith("}")) || (s.startsWith("[") && s.endsWith("]"))){
-      try{return JSON.parse(s);}catch(e){return v;}
-    }
-
-    return v;
-  }
-
-  function normalizeRows(rows){
-    return rows
-      .map(raw=>{
-        const out = {};
-
-        Object.keys(raw || {}).forEach(k=>{
-          const nk = normalizeHeader(k);
-          const v = cleanCell(raw[k]);
-
-          if(nk) out[nk] = v;
-        });
-
-        return out;
-      })
-      .filter(r=>Object.values(r).some(v=>!isEmptyValue(v)));
-  }
-
-  function parseWorkbook(wb, XLSXLib){
-    const groups = [];
-
-    wb.SheetNames.forEach(sheetName=>{
-      const rows = XLSXLib.utils.sheet_to_json(wb.Sheets[sheetName], {defval:""});
-      const cleanRows = normalizeRows(rows);
-
-      if(!cleanRows.length) return;
-
-      let model = cleanRows.find(r=>r._model)?._model || sheetNameToModel(sheetName);
-
-      if(!model){
-        warn(`Sheet tidak punya nama model dan tidak ada kolom _model: ${sheetName}`);
-        model = "";
-      }
-
-      const headers = Array.from(new Set(cleanRows.flatMap(r=>Object.keys(r))));
-
-      if(model){
-        groups.push({
-          sheet:sheetName,
-          model:String(model).trim(),
-          headers,
-          rows:cleanRows
-        });
-      }
-    });
-
-    return groups;
-  }
-
-  async function readImportFile(file){
-    if(!file) return;
-
-    state.fileName = file.name;
-    state.warnings = [];
-    state.results = [];
-
-    const lower = file.name.toLowerCase();
-
-    if(lower.endsWith(".json")){
-      const text = await file.text();
-      const json = JSON.parse(text);
-
-      const groups = [];
-
-      if(Array.isArray(json)){
-        const rows = normalizeRows(json);
-        const model = rows.find(r=>r._model)?._model || "";
-        groups.push({
-          sheet:"json",
-          model,
-          headers:Array.from(new Set(rows.flatMap(r=>Object.keys(r)))),
-          rows
-        });
-      } else if(json && typeof json === "object"){
-        Object.entries(json).forEach(([model, arr])=>{
-          if(Array.isArray(arr)){
-            const rows = normalizeRows(arr);
-            groups.push({
-              sheet:model,
-              model,
-              headers:Array.from(new Set(rows.flatMap(r=>Object.keys(r)))),
-              rows
-            });
-          }
-        });
-      }
-
-      state.groups = groups;
-    } else {
-      const XLSXLib = await getXLSX();
-      const buf = await file.arrayBuffer();
-      const wb = XLSXLib.read(buf, {type:"array"});
-      state.workbook = wb;
-      state.groups = parseWorkbook(wb, XLSXLib);
-    }
-
-    $("fileInfo").textContent = `${file.name} — ${state.groups.length} sheet import terbaca.`;
-
-    log("File terbaca.", {
-      file:file.name,
-      groups:state.groups.map(g=>({sheet:g.sheet, model:g.model, rows:g.rows.length}))
-    });
-
-    renderAll();
-  }
-
-  async function modelExists(model){
-    try{
-      const r = await rpc("ir.model","search_read",[[["model","=",model]]],{
-        fields:["id","model","name"],
-        limit:1
-      });
-
-      return r && r.length ? r[0] : null;
-    } catch(e){
-      return null;
-    }
-  }
-
-  async function fieldsGet(model){
-    if(state.modelFields[model]) return state.modelFields[model];
-
-    const fields = await rpc(model,"fields_get",[],{
-      attributes:["string","type","required","readonly","relation","selection","store"]
-    });
-
-    state.modelFields[model] = fields || {};
-    return state.modelFields[model];
-  }
-
-  async function scanModels(){
-    await testConnection();
-
-    state.scannedModels = [];
-    state.scannedFields = [];
-
-    const models = $("modelList").value
-      .split(/\n|,/)
-      .map(x=>x.trim())
-      .filter(Boolean);
-
-    for(const model of models){
-      try{
-        const info = await modelExists(model);
-
-        if(!info){
-          state.scannedModels.push({
-            model,
-            name:"",
-            status:"MISSING",
-            field_count:0,
-            error:"Model tidak ditemukan / tidak punya akses"
-          });
-          continue;
-        }
-
-        state.modelInfo[model] = info;
-
-        const f = await fieldsGet(model);
-
-        const fieldRows = Object.entries(f).map(([name,meta])=>({
-          model,
-          name,
-          string:meta.string || "",
-          type:meta.type || "",
-          relation:meta.relation || "",
-          required:!!meta.required,
-          readonly:!!meta.readonly
-        }));
-
-        state.scannedFields.push(...fieldRows);
-
-        state.scannedModels.push({
-          model,
-          name:info.name,
-          status:"OK",
-          field_count:fieldRows.length,
-          error:""
-        });
-      } catch(e){
-        state.scannedModels.push({
-          model,
-          name:"",
-          status:"ERROR",
-          field_count:0,
-          error:e.message
-        });
-      }
-
-      renderModels();
-      renderFields();
-    }
-
-    log("Scan models selesai.", {
-      models:state.scannedModels.length,
-      fields:state.scannedFields.length
-    });
-
-    renderAll();
-  }
-
-  function parseXmlid(xmlid){
-    const s = String(xmlid || "").trim();
-
-    if(!s) return null;
-
-    if(s.includes(".")){
-      const idx = s.indexOf(".");
-      return {
-        module:s.slice(0,idx),
-        name:s.slice(idx + 1)
-      };
-    }
-
-    return {
-      module:"lokalmart_importer",
-      name:s
-        .replace(/[^a-zA-Z0-9_]/g,"_")
-        .replace(/^_+/,"")
-        .slice(0,120)
-    };
-  }
-
-  async function resolveXmlid(xmlid, expectedModel){
-    const parts = parseXmlid(xmlid);
-    if(!parts) return null;
-
-    const r = await rpc("ir.model.data","search_read",[[["module","=",parts.module],["name","=",parts.name]]],{
-      fields:["id","module","name","model","res_id"],
-      limit:1
-    });
-
-    if(!r.length) return null;
-
-    if(expectedModel && r[0].model && r[0].model !== expectedModel){
-      warn(`External ID ${xmlid} ditemukan tetapi model berbeda.`, {
-        expectedModel,
-        foundModel:r[0].model
-      });
-    }
-
-    return r[0].res_id || null;
-  }
-
-  async function ensureXmlid(xmlid, model, resId){
-    if(!xmlid || !model || !resId) return;
-
-    const parts = parseXmlid(xmlid);
-    if(!parts) return;
-
-    try{
-      const existing = await rpc("ir.model.data","search_read",[[["module","=",parts.module],["name","=",parts.name]]],{
-        fields:["id","module","name","model","res_id"],
-        limit:1
-      });
-
-      const vals = {
-        module:parts.module,
-        name:parts.name,
-        model,
-        res_id:resId,
-        noupdate:false
-      };
-
-      if(existing.length){
-        await rpc("ir.model.data","write",[[existing[0].id],vals]);
-      } else {
-        await rpc("ir.model.data","create",[vals]);
-      }
-    } catch(e){
-      warn("Gagal membuat/update external id.", {
-        xmlid,
-        model,
-        resId,
-        error:e.message
-      });
-    }
-  }
-
-  async function nameSearch(model, value){
-    const s = String(value || "").trim();
-    if(!s) return null;
-
-    try{
-      const r = await rpc(model,"name_search",[s,[],"ilike",1],{});
-      if(r && r.length) return r[0][0];
-    } catch(e){}
-
-    try{
-      const r = await rpc(model,"search_read",[[["name","=",s]]],{
-        fields:["id","name"],
-        limit:1
-      });
-
-      if(r && r.length) return r[0].id;
-    } catch(e){}
-
-    return null;
-  }
-
-  async function resolveMany2one(relationModel, value, hint){
-    if(isEmptyValue(value)) return false;
-
-    const raw = parseMaybeJson(value);
-
-    if(typeof raw === "number") return raw;
-
-    const s = String(raw).trim();
-
-    if(!s) return false;
-
-    if(hint === "id" || /^\d+$/.test(s)){
-      return Number(s);
-    }
-
-    if(hint === "xmlid"){
-      return await resolveXmlid(s, relationModel);
-    }
-
-    if(relationModel === "ir.model"){
-      const byModel = await rpc("ir.model","search_read",[[["model","=",s]]],{
-        fields:["id","model","name"],
-        limit:1
-      });
-
-      if(byModel.length) return byModel[0].id;
-    }
-
-    if(!hint && /^[a-zA-Z_][a-zA-Z0-9_]*\.[a-zA-Z0-9_.-]+$/.test(s)){
-      const id = await resolveXmlid(s, relationModel);
-      if(id) return id;
-    }
-
-    return await nameSearch(relationModel, s);
-  }
-
-  async function resolveMany2many(relationModel, value, hint){
-    if(isEmptyValue(value)) return [[6,0,[]]];
-
-    const raw = parseMaybeJson(value);
-
-    if(Array.isArray(raw)){
-      const ids = [];
-
-      for(const item of raw){
-        const id = await resolveMany2one(relationModel,item,hint);
-        if(id) ids.push(id);
-      }
-
-      return [[6,0,ids]];
-    }
-
-    const items = String(value)
-      .split(",")
-      .map(x=>x.trim())
-      .filter(Boolean);
-
-    const ids = [];
-
-    for(const item of items){
-      const id = await resolveMany2one(relationModel,item,hint);
-      if(id) ids.push(id);
-    }
-
-    return [[6,0,ids]];
-  }
-
-  function splitFieldHint(header){
-    const h = String(header || "").trim();
-
-    if(h.includes("/")){
-      const parts = h.split("/");
-      return {
-        field:parts[0].trim(),
-        hint:(parts[1] || "").trim().toLowerCase()
-      };
-    }
-
-    return {
-      field:h,
-      hint:""
-    };
-  }
-
-  function modelProfileMatch(model, rawRow, values){
-    const profiles = {
-      "website.page":["url","key","name"],
-      "website.menu":["url","name"],
-      "ir.ui.view":["key","name"],
-      "ir.model.fields":["model_id","name"],
-      "project.project":["name"],
-      "project.task":["name","project_id"],
-      "project.milestone":["name","project_id"],
-      "product.template":["barcode","default_code","name"],
-      "product.product":["barcode","default_code"],
-      "product.category":["name"],
-      "res.partner":["email","phone","mobile","name"],
-      "crm.lead":["name","email_from","phone"],
-      "slide.channel":["name"],
-      "slide.slide":["name","channel_id"],
-      "account.analytic.account":["name"],
-      "account.analytic.line":["name","date","account_id"]
-    };
-
-    if(rawRow._match){
-      return String(rawRow._match)
-        .split(",")
-        .map(x=>x.trim())
-        .filter(Boolean);
-    }
-
-    return profiles[model] || ["name"];
-  }
-
-  async function buildValues(model, rawRow){
-    const fields = await fieldsGet(model);
-    const values = {};
-    const skipped = [];
-
-    const row = {...rawRow};
-
-    if(model === "ir.model.fields" && row.model && !row.model_id){
-      row.model_id = row.model;
-    }
-
-    for(const [rawHeader, rawValue] of Object.entries(row)){
-      if(rawHeader.startsWith("_")) continue;
-      if(["id","External ID","external_id","odoo_id"].includes(rawHeader)) continue;
-      if(isEmptyValue(rawValue)) continue;
-
-      const {field,hint} = splitFieldHint(rawHeader);
-
-      if(!fields[field]){
-        skipped.push({
-          field,
-          reason:"Field tidak ada pada model"
-        });
-        continue;
-      }
-
-      const meta = fields[field];
-      const type = meta.type;
-
-      try{
-        if(["char","text","html","selection","date","datetime","binary"].includes(type)){
-          values[field] = String(rawValue);
-        } else if(["integer"].includes(type)){
-          values[field] = Number(rawValue || 0);
-        } else if(["float","monetary"].includes(type)){
-          values[field] = Number(rawValue || 0);
-        } else if(["boolean"].includes(type)){
-          values[field] = parseBoolean(rawValue);
-        } else if(type === "many2one"){
-          const id = await resolveMany2one(meta.relation, rawValue, hint);
-          values[field] = id || false;
-        } else if(type === "many2many"){
-          values[field] = await resolveMany2many(meta.relation, rawValue, hint);
-        } else if(type === "one2many"){
-          const parsed = parseMaybeJson(rawValue);
-
-          if(Array.isArray(parsed)){
-            values[field] = parsed;
-          } else {
-            skipped.push({
-              field,
-              reason:"one2many hanya didukung bila value JSON command Odoo"
-            });
-          }
-        } else {
-          values[field] = parseMaybeJson(rawValue);
-        }
-      } catch(e){
-        skipped.push({
-          field,
-          reason:e.message
-        });
-      }
-    }
-
-    return {values, skipped};
-  }
-
-  async function findExisting(model, rawRow, values){
-    if(rawRow._odoo_id && /^\d+$/.test(String(rawRow._odoo_id))){
-      return Number(rawRow._odoo_id);
-    }
-
-    if(rawRow.odoo_id && /^\d+$/.test(String(rawRow.odoo_id))){
-      return Number(rawRow.odoo_id);
-    }
-
-    if(rawRow.id && /^\d+$/.test(String(rawRow.id))){
-      return Number(rawRow.id);
-    }
-
-    const externalId = rawRow._external_id || rawRow.external_id || rawRow.id;
-
-    if(externalId && String(externalId).trim() && !/^\d+$/.test(String(externalId))){
-      const id = await resolveXmlid(externalId, model);
-      if(id) return id;
-    }
-
-    const matchFields = modelProfileMatch(model, rawRow, values);
-    const domain = [];
-
-    for(const f of matchFields){
-      if(values[f] !== undefined && values[f] !== false && values[f] !== ""){
-        domain.push([f,"=",values[f]]);
-      }
-    }
-
-    if(domain.length){
-      try{
-        const r = await rpc(model,"search_read",[domain],{
-          fields:["id"],
-          limit:1
-        });
-
-        if(r.length) return r[0].id;
-      } catch(e){}
-    }
-
-    return null;
-  }
-
-  async function importOneRow(model, rawRow, dryRun){
-    const action = String(rawRow._action || "upsert").trim().toLowerCase();
-    const externalId = rawRow._external_id || rawRow.external_id || rawRow.id || "";
-
-    if(!model){
-      return {
-        model:"",
-        action,
-        status:"error",
-        id:"",
-        external_id:externalId,
-        message:"Model kosong. Gunakan nama sheet model Odoo atau kolom _model."
-      };
-    }
-
-    if(action === "skip"){
-      return {
-        model,
-        action,
-        status:"skipped",
-        id:"",
-        external_id:externalId,
-        message:"Row dilewati karena _action=skip"
-      };
-    }
-
-    if(!(await modelExists(model))){
-      return {
-        model,
-        action,
-        status:"error",
-        id:"",
-        external_id:externalId,
-        message:"Model tidak ditemukan atau tidak punya akses."
-      };
-    }
-
-    const built = await buildValues(model, rawRow);
-    const values = built.values;
-
-    if(built.skipped.length){
-      warn(`Sebagian kolom dilewati pada ${model}.`, {
-        row:rawRow,
-        skipped:built.skipped
-      });
-    }
-
-    const existingId = await findExisting(model, rawRow, values);
-
-    if(dryRun){
-      return {
-        model,
-        action,
-        status:"dry_run",
-        id:existingId || "",
-        external_id:externalId,
-        message:existingId
-          ? "Akan update record existing."
-          : "Akan create record baru."
-      };
-    }
-
-    if(action === "delete" || action === "unlink"){
-      if(!existingId){
-        return {
-          model,
-          action,
-          status:"skipped",
-          id:"",
-          external_id:externalId,
-          message:"Tidak dihapus karena record existing tidak ditemukan."
-        };
-      }
-
-      await rpc(model,"unlink",[[existingId]],{});
-
-      return {
-        model,
-        action,
-        status:"deleted",
-        id:existingId,
-        external_id:externalId,
-        message:"Record dihapus."
-      };
-    }
-
-    if(action === "update"){
-      if(!existingId){
-        return {
-          model,
-          action,
-          status:"error",
-          id:"",
-          external_id:externalId,
-          message:"_action=update tetapi record existing tidak ditemukan."
-        };
-      }
-
-      await rpc(model,"write",[[existingId],values],{});
-
-      if(externalId) await ensureXmlid(externalId,model,existingId);
-
-      return {
-        model,
-        action,
-        status:"updated",
-        id:existingId,
-        external_id:externalId,
-        message:"Record berhasil diupdate."
-      };
-    }
-
-    if(action === "create"){
-      const newId = await rpc(model,"create",[values],{});
-
-      if(externalId) await ensureXmlid(externalId,model,newId);
-
-      return {
-        model,
-        action,
-        status:"created",
-        id:newId,
-        external_id:externalId,
-        message:"Record baru berhasil dibuat."
-      };
-    }
-
-    if(existingId){
-      await rpc(model,"write",[[existingId],values],{});
-
-      if(externalId) await ensureXmlid(externalId,model,existingId);
-
-      return {
-        model,
-        action:"upsert",
-        status:"updated",
-        id:existingId,
-        external_id:externalId,
-        message:"Record existing berhasil diupdate."
-      };
-    }
-
-    const newId = await rpc(model,"create",[values],{});
-
-    if(externalId) await ensureXmlid(externalId,model,newId);
-
-    return {
-      model,
-      action:"upsert",
-      status:"created",
-      id:newId,
-      external_id:externalId,
-      message:"Record baru berhasil dibuat."
-    };
-  }
-
-  function groupSortPriority(model){
-    const order = {
-      "ir.model":1,
-      "ir.model.fields":2,
-      "ir.ui.view":3,
-      "website.page":4,
-      "website.menu":5,
-      "res.partner":10,
-      "product.category":11,
-      "product.template":12,
-      "product.product":13,
-      "project.project":20,
-      "project.milestone":21,
-      "project.task":22,
-      "account.analytic.account":30,
-      "account.analytic.line":31,
-      "slide.channel":40,
-      "slide.slide":41,
-      "crm.lead":50
-    };
-
-    return order[model] || 100;
-  }
-
-  async function runImport(dryRun){
-    if(!state.groups.length){
-      alert("Belum ada file. Pilih XLSX/JSON dulu.");
-      return;
-    }
-
-    await testConnection();
-
-    state.results = [];
-    renderResults();
-
-    const groups = [...state.groups].sort((a,b)=>groupSortPriority(a.model) - groupSortPriority(b.model));
-
-    log(dryRun ? "Dry run dimulai." : "Import dimulai.", {
-      groups:groups.map(g=>({model:g.model, rows:g.rows.length}))
-    });
-
-    for(const group of groups){
-      for(let i=0;i<group.rows.length;i++){
-        const rawRow = group.rows[i];
-        const model = String(rawRow._model || group.model || "").trim();
-
-        try{
-          const result = await importOneRow(model,rawRow,dryRun);
-          state.results.push(result);
-          log(`${result.status.toUpperCase()} ${model}`, result);
-        } catch(e){
-          const result = {
-            model,
-            action:rawRow._action || "upsert",
-            status:"error",
-            id:"",
-            external_id:rawRow._external_id || rawRow.id || "",
-            message:e.message
-          };
-
-          state.results.push(result);
-          warn(`Gagal import ${model} row ${i + 1}.`, {
-            error:e.message,
-            row:rawRow
-          });
-        }
-
-        renderResults();
-        renderKpis();
-      }
-    }
-
-    log(dryRun ? "Dry run selesai." : "Import selesai.", {
-      total:state.results.length,
-      created:state.results.filter(r=>r.status==="created").length,
-      updated:state.results.filter(r=>r.status==="updated").length,
-      deleted:state.results.filter(r=>r.status==="deleted").length,
-      error:state.results.filter(r=>r.status==="error").length
-    });
-
-    alert(dryRun ? "Dry run selesai. Lihat tab Result/Log." : "Import selesai. Lihat tab Result/Log.");
-  }
-
-  async function exportTemplate(){
-    const XLSXLib = await getXLSX();
-    const wb = XLSXLib.utils.book_new();
-
-    const readme = [
-      ["Lokalmart Universal XLSX Importer V6.1"],
-      [""],
-      ["Cara pakai:"],
-      ["1. Nama sheet gunakan nama model Odoo, contoh project.task"],
-      ["2. Kolom biasa adalah nama field Odoo"],
-      ["3. Kolom khusus: _action, _external_id, _match, _model"],
-      ["4. Relasi many2one bisa memakai field, field/id, field/name, field/xmlid"],
-      ["5. Many2many memakai koma, contoh tag_ids = Tag A, Tag B"],
-      [""],
-      ["Action:"],
-      ["upsert = create/update otomatis"],
-      ["create = paksa create"],
-      ["update = hanya update existing"],
-      ["delete = hapus existing"],
-      ["skip = lewati row"]
-    ];
-
-    XLSXLib.utils.book_append_sheet(wb, XLSXLib.utils.aoa_to_sheet(readme), "00_README");
-
-    const projectRows = [
-      {
-        _action:"upsert",
-        _external_id:"lokalmart_importer.project_ground_zero",
-        _match:"name",
-        name:"Ground Zero Lokalmart",
-        description:"Project induk penguatan sistem Lokalmart.",
-        privacy_visibility:"employees"
-      }
-    ];
-
-    const taskRows = [
-      {
-        _action:"upsert",
-        _external_id:"lokalmart_importer.task_scan_page",
-        _match:"name,project_id",
-        name:"Bangun halaman /scan Lokalmart",
-        project_id:"Ground Zero Lokalmart",
-        description:"Membuat page scan barcode, QR, dan Lokal ID.",
-        priority:"1"
-      }
-    ];
-
-    const pageRows = [
-      {
-        _action:"upsert",
-        _external_id:"lokalmart_importer.page_scan",
-        _match:"url",
-        name:"Lokalmart Scan",
-        url:"/scan",
-        type:"qweb",
-        key:"lokalmart.page_scan",
-        is_published:true,
-        website_published:true,
-        website_meta_title:"Scan Barcode dan Lokal ID Lokalmart",
-        website_meta_description:"Halaman scan barcode, QR produk UMKM, dan Lokal ID."
-      }
-    ];
-
-    const customFieldRows = [
-      {
-        _action:"upsert",
-        _external_id:"lokalmart_importer.field_project_task_x_lokal_role",
-        _match:"model_id,name",
-        model_id:"project.task",
-        name:"x_lokal_role",
-        field_description:"Lokal Role",
-        ttype:"char",
-        state:"manual"
-      }
-    ];
-
-    XLSXLib.utils.book_append_sheet(wb, XLSXLib.utils.json_to_sheet(projectRows), "project.project");
-    XLSXLib.utils.book_append_sheet(wb, XLSXLib.utils.json_to_sheet(taskRows), "project.task");
-    XLSXLib.utils.book_append_sheet(wb, XLSXLib.utils.json_to_sheet(pageRows), "website.page");
-    XLSXLib.utils.book_append_sheet(wb, XLSXLib.utils.json_to_sheet(customFieldRows), "ir.model.fields");
-
-    XLSXLib.writeFile(wb, "lokalmart_universal_import_template_v6_1.xlsx");
-  }
-
-  document.querySelectorAll(".tab").forEach(btn=>{
-    btn.addEventListener("click",()=>{
-      document.querySelectorAll(".tab").forEach(b=>b.classList.remove("active"));
-      btn.classList.add("active");
-
-      ["preview","models","fields","result","log"].forEach(t=>{
-        $("tab-" + t).classList.toggle("hidden",t !== btn.dataset.tab);
-      });
-    });
-  });
-
-  $("btnTest").addEventListener("click",()=>{
-    testConnection().catch(e=>{
-      log("Test koneksi gagal.", e.message);
-      alert(e.message);
-    });
-  });
-
-  $("btnScanModels").addEventListener("click",()=>{
-    scanModels().catch(e=>{
-      log("Scan models gagal.", e.message);
-      alert(e.message);
-    });
-  });
-
-  $("btnChooseImport").addEventListener("click",()=>{
-    $("importFile").click();
-  });
-
-  $("importFile").addEventListener("change",e=>{
-    readImportFile(e.target.files[0]).catch(err=>{
-      log("Gagal membaca file.", err.message);
-      alert(err.message);
-    });
-  });
-
-  $("btnDryRun").addEventListener("click",()=>{
-    runImport(true).catch(e=>{
-      log("Dry run gagal.", e.message);
-      alert(e.message);
-    });
-  });
-
-  $("btnImport").addEventListener("click",()=>{
-    const ok = confirm("Import akan menulis data ke Odoo. Lanjutkan?");
-    if(!ok) return;
-
-    runImport(false).catch(e=>{
-      log("Import gagal.", e.message);
-      alert(e.message);
-    });
-  });
-
-  $("btnExportTemplate").addEventListener("click",function(){
-    exportTemplate().catch(function(e){
-      log("Export template gagal.", e.message);
-      alert(e.message);
-    });
-  });
-
-  const drop = $("drop");
-
-  drop.addEventListener("click",()=>$("importFile").click());
-
-  drop.addEventListener("dragover",e=>{
-    e.preventDefault();
-    drop.classList.add("drag");
-  });
-
-  drop.addEventListener("dragleave",()=>{
-    drop.classList.remove("drag");
-  });
-
-  drop.addEventListener("drop",e=>{
-    e.preventDefault();
-    drop.classList.remove("drag");
-
-    const file = e.dataTransfer.files[0];
-
-    readImportFile(file).catch(err=>{
-      log("Gagal membaca file.", err.message);
-      alert(err.message);
-    });
-  });
-
+  const state={uid:null,workbook:null,fileName:"",groups:[],modelFields:{},modelInfo:{},scannedModels:[],scannedFields:[],results:[],warnings:[]};
+  const $=id=>document.getElementById(id);
+  function log(msg,data){const line=`[${new Date().toLocaleTimeString()}] ${msg}`+(data===undefined?"":"\n"+(typeof data==="string"?data:JSON.stringify(data,null,2)));$("log").textContent=line+"\n\n"+$("log").textContent;}
+  function warn(msg,data){state.warnings.push({time:new Date().toISOString(),msg,data});log("WARNING: "+msg,data);renderKpis();}
+  function getCreds(){return{baseUrl:$("baseUrl").value.trim().replace(/\/+$/,"") ,db:$("db").value.trim(),login:$("login").value.trim(),password:$("password").value};}
+  async function rpc(model,method,args=[],kwargs={}){const res=await fetch("/api/odoo",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({...getCreds(),uid:state.uid,model,method,args,kwargs})});const p=await res.json().catch(()=>({ok:false,error:"Invalid JSON response"}));if(!p.ok)throw new Error(p.error||"RPC failed");if(p.uid)state.uid=p.uid;return p.result;}
+  async function testConnection(){const res=await fetch("/api/odoo",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(getCreds())});const p=await res.json();if(!p.ok)throw new Error(p.error||"Authentication failed");state.uid=p.uid;log("Koneksi Odoo berhasil.",{uid:state.uid});return p.uid;}
+  function esc(v){return String(v==null?"":v).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/\"/g,"&quot;");}
+  function table(rows,cols){if(!rows||!rows.length)return '<p class="small">Belum ada data.</p>';return `<table><thead><tr>${cols.map(c=>`<th>${esc(c.label)}</th>`).join("")}</tr></thead><tbody>`+rows.map(r=>`<tr>${cols.map(c=>`<td>${c.render?c.render(r):esc(r[c.key])}</td>`).join("")}</tr>`).join("")+`</tbody></table>`;}
+  function renderKpis(){ $("kpiSheets").textContent=state.groups.length;$("kpiRows").textContent=state.groups.reduce((n,g)=>n+g.rows.length,0);$("kpiModels").textContent=new Set(state.groups.map(g=>g.model).filter(Boolean)).size;$("kpiErrors").textContent=state.warnings.length; }
+  function renderPreview(){const rows=state.groups.map(g=>({sheet:g.sheet,model:g.model,rows:g.rows.length,columns:g.headers.join(", ").slice(0,260)}));$("previewTable").innerHTML=table(rows,[{key:"sheet",label:"Sheet"},{key:"model",label:"Model",render:r=>`<span class="mono">${esc(r.model)}</span>`},{key:"rows",label:"Rows"},{key:"columns",label:"Columns"}]);}
+  function renderModels(){$("modelsTable").innerHTML=table(state.scannedModels,[{key:"model",label:"Model",render:r=>`<span class="mono">${esc(r.model)}</span>`},{key:"name",label:"Name"},{key:"status",label:"Status",render:r=>r.status==="OK"?'<span class="pill ok">OK</span>':'<span class="pill bad">Missing/Error</span>'},{key:"field_count",label:"Fields"},{key:"error",label:"Error"}]);}
+  function renderFields(){$("fieldsTable").innerHTML=table(state.scannedFields.slice(0,1000),[{key:"model",label:"Model",render:r=>`<span class="mono">${esc(r.model)}</span>`},{key:"name",label:"Field",render:r=>`<span class="mono">${esc(r.name)}</span>`},{key:"string",label:"Label"},{key:"type",label:"Type"},{key:"relation",label:"Relation",render:r=>`<span class="mono">${esc(r.relation)}</span>`},{key:"required",label:"Req"},{key:"readonly",label:"Readonly"}]);}
+  function renderResults(){$("resultTable").innerHTML=table(state.results.slice(0,1000),[{key:"model",label:"Model",render:r=>`<span class="mono">${esc(r.model)}</span>`},{key:"action",label:"Action"},{key:"status",label:"Status",render:r=>r.status==="created"||r.status==="updated"?`<span class="pill ok">${esc(r.status)}</span>`:r.status==="error"?'<span class="pill bad">error</span>':`<span class="pill warn">${esc(r.status)}</span>`},{key:"id",label:"Odoo ID"},{key:"external_id",label:"External ID"},{key:"message",label:"Message"}]);}
+  function renderAll(){renderKpis();renderPreview();renderModels();renderFields();renderResults();}
+  function normalizeHeader(h){const raw=String(h||"").trim();const map={"External ID":"_external_id",external_id:"_external_id",xml_id:"_external_id","XML ID":"_external_id","Odoo ID":"_odoo_id",odoo_id:"_odoo_id",Action:"_action",action:"_action",Model:"_model",_model:"_model",_action:"_action",_external_id:"_external_id",_match:"_match",_odoo_id:"_odoo_id",Match:"_match",match:"_match"};return map[raw]||raw;}
+  function sheetNameToModel(s){s=String(s||"").trim();if(/^[a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)+$/i.test(s))return s;const f=s.match(/[a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)+/ig);return f&&f.length?f[f.length-1]:"";}
+  function isEmpty(v){return v===undefined||v===null||(typeof v==="string"&&v.trim()==="");}
+  function cleanCell(v){return v===undefined||v===null?"":(typeof v==="string"?v.trim():v);}
+  function parseBool(v){if(typeof v==="boolean")return v;if(typeof v==="number")return v!==0;const s=String(v||"").trim().toLowerCase();if(["true","yes","ya","y","1","benar"].includes(s))return true;if(["false","no","tidak","n","0","salah"].includes(s))return false;return Boolean(v);}
+  function parseMaybeJson(v){if(typeof v!=="string")return v;const s=v.trim();if(!s)return v;if((s.startsWith("{")&&s.endsWith("}"))||(s.startsWith("[")&&s.endsWith("]"))){try{return JSON.parse(s);}catch(e){return v;}}return v;}
+  function normalizeRows(rows){return rows.map(raw=>{const out={};Object.keys(raw||{}).forEach(k=>{const nk=normalizeHeader(k),v=cleanCell(raw[k]);if(nk)out[nk]=v;});return out;}).filter(r=>Object.values(r).some(v=>!isEmpty(v)));}
+  function parseWorkbook(wb,XLSXLib){const groups=[];wb.SheetNames.forEach(sheetName=>{const rows=XLSXLib.utils.sheet_to_json(wb.Sheets[sheetName],{defval:""});const clean=normalizeRows(rows);if(!clean.length)return;let model=clean.find(r=>r._model)?._model||sheetNameToModel(sheetName);if(!model){warn(`Sheet tidak punya nama model: ${sheetName}`);return;}groups.push({sheet:sheetName,model:String(model).trim(),headers:Array.from(new Set(clean.flatMap(r=>Object.keys(r)))),rows:clean});});return groups;}
+  async function readImportFile(file){if(!file)return;state.fileName=file.name;state.warnings=[];state.results=[];const lower=file.name.toLowerCase();if(lower.endsWith(".json")){const json=JSON.parse(await file.text());const groups=[];if(Array.isArray(json)){const rows=normalizeRows(json);groups.push({sheet:"json",model:rows.find(r=>r._model)?._model||"",headers:Array.from(new Set(rows.flatMap(r=>Object.keys(r)))),rows});}else if(json&&typeof json==="object"){Object.entries(json).forEach(([model,arr])=>{if(Array.isArray(arr)){const rows=normalizeRows(arr);groups.push({sheet:model,model,headers:Array.from(new Set(rows.flatMap(r=>Object.keys(r)))),rows});}});}state.groups=groups;}else{const XLSXLib=await getXLSX();const buf=await file.arrayBuffer();const wb=XLSXLib.read(buf,{type:"array"});state.workbook=wb;state.groups=parseWorkbook(wb,XLSXLib);}$("fileInfo").textContent=`${file.name} — ${state.groups.length} sheet import terbaca.`;log("File terbaca.",{file:file.name,groups:state.groups.map(g=>({sheet:g.sheet,model:g.model,rows:g.rows.length}))});renderAll();}
+  async function modelExists(model){try{const r=await rpc("ir.model","search_read",[[["model","=",model]]],{fields:["id","model","name"],limit:1});return r&&r.length?r[0]:null;}catch(e){return null;}}
+  async function fieldsGet(model){if(state.modelFields[model])return state.modelFields[model];state.modelFields[model]=await rpc(model,"fields_get",[],{attributes:["string","type","required","readonly","relation","selection","store"]});return state.modelFields[model]||{};}
+  async function scanModels(){await testConnection();state.scannedModels=[];state.scannedFields=[];const models=$("modelList").value.split(/\n|,/).map(x=>x.trim()).filter(Boolean);for(const model of models){try{const info=await modelExists(model);if(!info){state.scannedModels.push({model,name:"",status:"MISSING",field_count:0,error:"Model tidak ditemukan / tidak punya akses"});continue;}const f=await fieldsGet(model);const rows=Object.entries(f).map(([name,meta])=>({model,name,string:meta.string||"",type:meta.type||"",relation:meta.relation||"",required:!!meta.required,readonly:!!meta.readonly}));state.scannedFields.push(...rows);state.scannedModels.push({model,name:info.name,status:"OK",field_count:rows.length,error:""});}catch(e){state.scannedModels.push({model,name:"",status:"ERROR",field_count:0,error:e.message});}renderModels();renderFields();}log("Scan models selesai.",{models:state.scannedModels.length,fields:state.scannedFields.length});renderAll();}
+  function parseXmlid(xmlid){const s=String(xmlid||"").trim();if(!s)return null;if(s.includes(".")){const i=s.indexOf(".");return{module:s.slice(0,i),name:s.slice(i+1)};}return{module:"lokalmart_importer",name:s.replace(/[^a-zA-Z0-9_]/g,"_").replace(/^_+/,"").slice(0,120)};}
+  async function resolveXmlid(xmlid,expectedModel){const p=parseXmlid(xmlid);if(!p)return null;const r=await rpc("ir.model.data","search_read",[[["module","=",p.module],["name","=",p.name]]],{fields:["id","module","name","model","res_id"],limit:1});if(!r.length)return null;if(expectedModel&&r[0].model&&r[0].model!==expectedModel)warn(`External ID model berbeda: ${xmlid}`,{expectedModel,foundModel:r[0].model});return r[0].res_id||null;}
+  async function ensureXmlid(xmlid,model,resId){if(!xmlid||!model||!resId)return;const p=parseXmlid(xmlid);if(!p)return;try{const ex=await rpc("ir.model.data","search_read",[[["module","=",p.module],["name","=",p.name]]],{fields:["id"],limit:1});const vals={module:p.module,name:p.name,model,res_id:resId,noupdate:false};if(ex.length)await rpc("ir.model.data","write",[[ex[0].id],vals],{});else await rpc("ir.model.data","create",[vals],{});}catch(e){warn("Gagal membuat/update external id.",{xmlid,model,resId,error:e.message});}}
+  async function nameSearch(model,value){const s=String(value||"").trim();if(!s)return null;try{const r=await rpc(model,"name_search",[s,[],"ilike",1],{});if(r&&r.length)return r[0][0];}catch(e){}try{const r=await rpc(model,"search_read",[[["name","=",s]]],{fields:["id","name"],limit:1});if(r&&r.length)return r[0].id;}catch(e){}return null;}
+  async function resolveMany2one(rel,value,hint){if(isEmpty(value))return false;const raw=parseMaybeJson(value);if(typeof raw==="number")return raw;const s=String(raw).trim();if(!s)return false;if(hint==="id"||/^\d+$/.test(s))return Number(s);if(hint==="xmlid")return await resolveXmlid(s,rel);if(rel==="ir.model"){const r=await rpc("ir.model","search_read",[[["model","=",s]]],{fields:["id"],limit:1});if(r.length)return r[0].id;}if(!hint&&/^[a-zA-Z_][a-zA-Z0-9_]*\.[a-zA-Z0-9_.-]+$/.test(s)){const id=await resolveXmlid(s,rel);if(id)return id;}return await nameSearch(rel,s);}
+  async function resolveMany2many(rel,value,hint){if(isEmpty(value))return [[6,0,[]]];const raw=parseMaybeJson(value);const items=Array.isArray(raw)?raw:String(value).split(",").map(x=>x.trim()).filter(Boolean);const ids=[];for(const item of items){const id=await resolveMany2one(rel,item,hint);if(id)ids.push(id);}return [[6,0,ids]];}
+  function splitFieldHint(header){const h=String(header||"").trim();if(h.includes("/")){const p=h.split("/");return{field:p[0].trim(),hint:(p[1]||"").trim().toLowerCase()};}return{field:h,hint:""};}
+  function modelProfileMatch(model,rawRow,values){const profiles={"website.page":["url","key","name"],"website.menu":["url","name"],"ir.ui.view":["key","name"],"ir.model.fields":["model_id","name"],"project.project":["name"],"project.task":["name","project_id"],"project.milestone":["name","project_id"],"product.template":["barcode","default_code","name"],"product.product":["barcode","default_code"],"product.category":["name"],"res.partner":["email","phone","mobile","name"],"crm.lead":["name","email_from","phone"],"slide.channel":["name"],"slide.slide":["name","channel_id"],"account.analytic.account":["name"],"account.analytic.line":["name","date","account_id"]};return rawRow._match?String(rawRow._match).split(",").map(x=>x.trim()).filter(Boolean):(profiles[model]||["name"]);}
+  async function buildValues(model,rawRow){const fields=await fieldsGet(model),values={},skipped=[],row={...rawRow};if(model==="ir.model.fields"&&row.model&&!row.model_id)row.model_id=row.model;for(const [rawHeader,rawValue] of Object.entries(row)){if(rawHeader.startsWith("_"))continue;if(["id","External ID","external_id","odoo_id"].includes(rawHeader))continue;if(isEmpty(rawValue))continue;const {field,hint}=splitFieldHint(rawHeader);if(!fields[field]){skipped.push({field,reason:"Field tidak ada pada model"});continue;}const meta=fields[field],type=meta.type;try{if(["char","text","html","selection","date","datetime","binary"].includes(type))values[field]=String(rawValue);else if(type==="integer")values[field]=Number(rawValue||0);else if(["float","monetary"].includes(type))values[field]=Number(rawValue||0);else if(type==="boolean")values[field]=parseBool(rawValue);else if(type==="many2one")values[field]=await resolveMany2one(meta.relation,rawValue,hint)||false;else if(type==="many2many")values[field]=await resolveMany2many(meta.relation,rawValue,hint);else if(type==="one2many"){const parsed=parseMaybeJson(rawValue);Array.isArray(parsed)?values[field]=parsed:skipped.push({field,reason:"one2many butuh JSON command Odoo"});}else values[field]=parseMaybeJson(rawValue);}catch(e){skipped.push({field,reason:e.message});}}return{values,skipped};}
+  async function findExisting(model,rawRow,values){if(rawRow._odoo_id&&/^\d+$/.test(String(rawRow._odoo_id)))return Number(rawRow._odoo_id);if(rawRow.odoo_id&&/^\d+$/.test(String(rawRow.odoo_id)))return Number(rawRow.odoo_id);if(rawRow.id&&/^\d+$/.test(String(rawRow.id)))return Number(rawRow.id);const externalId=rawRow._external_id||rawRow.external_id||rawRow.id;if(externalId&&String(externalId).trim()&&!/^\d+$/.test(String(externalId))){const id=await resolveXmlid(externalId,model);if(id)return id;}const domain=[];for(const f of modelProfileMatch(model,rawRow,values)){if(values[f]!==undefined&&values[f]!==false&&values[f]!=="")domain.push([f,"=",values[f]]);}if(domain.length){try{const r=await rpc(model,"search_read",[domain],{fields:["id"],limit:1});if(r.length)return r[0].id;}catch(e){}}return null;}
+  async function importOneRow(model,rawRow,dryRun){const action=String(rawRow._action||"upsert").trim().toLowerCase(),externalId=rawRow._external_id||rawRow.external_id||rawRow.id||"";if(!model)return{model:"",action,status:"error",id:"",external_id:externalId,message:"Model kosong."};if(action==="skip")return{model,action,status:"skipped",id:"",external_id:externalId,message:"Row dilewati."};if(!(await modelExists(model)))return{model,action,status:"error",id:"",external_id:externalId,message:"Model tidak ditemukan / tidak punya akses."};const built=await buildValues(model,rawRow),values=built.values;if(built.skipped.length)warn(`Sebagian kolom dilewati pada ${model}.`,{row:rawRow,skipped:built.skipped});const existingId=await findExisting(model,rawRow,values);if(dryRun)return{model,action,status:"dry_run",id:existingId||"",external_id:externalId,message:existingId?"Akan update record existing.":"Akan create record baru."};if(action==="delete"||action==="unlink"){if(!existingId)return{model,action,status:"skipped",id:"",external_id:externalId,message:"Existing tidak ditemukan."};await rpc(model,"unlink",[[existingId]],{});return{model,action,status:"deleted",id:existingId,external_id:externalId,message:"Record dihapus."};}if(action==="update"){if(!existingId)return{model,action,status:"error",id:"",external_id:externalId,message:"_action=update tetapi existing tidak ditemukan."};await rpc(model,"write",[[existingId],values],{});if(externalId)await ensureXmlid(externalId,model,existingId);return{model,action,status:"updated",id:existingId,external_id:externalId,message:"Record diupdate."};}if(action==="create"){const newId=await rpc(model,"create",[values],{});if(externalId)await ensureXmlid(externalId,model,newId);return{model,action,status:"created",id:newId,external_id:externalId,message:"Record dibuat."};}if(existingId){await rpc(model,"write",[[existingId],values],{});if(externalId)await ensureXmlid(externalId,model,existingId);return{model,action:"upsert",status:"updated",id:existingId,external_id:externalId,message:"Record existing diupdate."};}const newId=await rpc(model,"create",[values],{});if(externalId)await ensureXmlid(externalId,model,newId);return{model,action:"upsert",status:"created",id:newId,external_id:externalId,message:"Record baru dibuat."};}
+  function groupSortPriority(model){return({"ir.model":1,"ir.model.fields":2,"ir.ui.view":3,"website.page":4,"website.menu":5,"res.partner":10,"product.category":11,"product.template":12,"product.product":13,"project.project":20,"project.milestone":21,"project.task":22,"account.analytic.account":30,"account.analytic.line":31,"slide.channel":40,"slide.slide":41,"crm.lead":50}[model]||100);}
+  async function runImport(dryRun){if(!state.groups.length){alert("Belum ada file. Pilih XLSX/JSON dulu.");return;}await testConnection();state.results=[];renderResults();const groups=[...state.groups].sort((a,b)=>groupSortPriority(a.model)-groupSortPriority(b.model));log(dryRun?"Dry run dimulai.":"Import dimulai.",{groups:groups.map(g=>({model:g.model,rows:g.rows.length}))});for(const group of groups){for(let i=0;i<group.rows.length;i++){const rawRow=group.rows[i],model=String(rawRow._model||group.model||"").trim();try{const result=await importOneRow(model,rawRow,dryRun);state.results.push(result);log(`${result.status.toUpperCase()} ${model}`,result);}catch(e){const result={model,action:rawRow._action||"upsert",status:"error",id:"",external_id:rawRow._external_id||rawRow.id||"",message:e.message};state.results.push(result);warn(`Gagal import ${model} row ${i+1}.`,{error:e.message,row:rawRow});}renderResults();renderKpis();}}log(dryRun?"Dry run selesai.":"Import selesai.",{total:state.results.length,created:state.results.filter(r=>r.status==="created").length,updated:state.results.filter(r=>r.status==="updated").length,error:state.results.filter(r=>r.status==="error").length});alert(dryRun?"Dry run selesai. Lihat Result/Log.":"Import selesai. Lihat Result/Log.");}
+  async function exportTemplate(){const XLSXLib=await getXLSX();const wb=XLSXLib.utils.book_new();XLSXLib.utils.book_append_sheet(wb,XLSXLib.utils.aoa_to_sheet([["Lokalmart Universal Importer V7"],["Sheet gunakan nama model Odoo."],["Kolom khusus: _action, _external_id, _match, _model"]]),"00_README");XLSXLib.utils.book_append_sheet(wb,XLSXLib.utils.json_to_sheet([{_action:"upsert",_external_id:"lokalmart_importer.project_ground_zero",_match:"name",name:"Ground Zero Lokalmart",description:"Project induk Lokalmart."}]),"project.project");XLSXLib.utils.book_append_sheet(wb,XLSXLib.utils.json_to_sheet([{_action:"upsert",_external_id:"lokalmart_importer.task_scan_page",_match:"name,project_id",name:"Bangun halaman /scan Lokalmart",project_id:"Ground Zero Lokalmart",description:"Membuat page scan barcode, QR, dan Lokal ID.",priority:"1"}]),"project.task");XLSXLib.writeFile(wb,"lokalmart_universal_import_template_v7.xlsx");}
+  async function exportAudit(){const creds=getCreds();if(!creds.baseUrl||!creds.db||!creds.login||!creds.password){alert("Lengkapi koneksi Odoo dulu.");return;}const mode=$("auditMode").value;const body={...creds,modelList:$("auditModelList").value.split(/\n|,/).map(x=>x.trim()).filter(Boolean),limit:Number($("auditLimit").value||1500),includeArch:mode!=="light",includeAllFields:mode==="allfields"};log("Export Full Autopsy XLSX dimulai.",body);const res=await fetch("/api/audit",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});if(!res.ok){let msg="Audit gagal.";try{const j=await res.json();msg=j.error||msg;log("Audit gagal.",j);}catch(e){msg=await res.text();log("Audit gagal.",msg);}throw new Error(msg);}const blob=await res.blob();const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=`lokalmart_odoo_full_autopsy_${new Date().toISOString().slice(0,10)}.xlsx`;document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url);log("Export Full Autopsy XLSX selesai. Upload file hasil export ke ChatGPT agar bisa saya audit detail.");}
+  document.querySelectorAll(".tab").forEach(btn=>btn.addEventListener("click",()=>{document.querySelectorAll(".tab").forEach(b=>b.classList.remove("active"));btn.classList.add("active");["preview","models","fields","result","log"].forEach(t=>$("tab-"+t).classList.toggle("hidden",t!==btn.dataset.tab));}));
+  $("btnTest").addEventListener("click",()=>testConnection().then(()=>alert("Koneksi berhasil.")).catch(e=>{log("Test koneksi gagal.",e.message);alert(e.message);}));
+  $("btnScanModels").addEventListener("click",()=>scanModels().catch(e=>{log("Scan models gagal.",e.message);alert(e.message);}));
+  $("btnChooseImport").addEventListener("click",()=>$("importFile").click());
+  $("importFile").addEventListener("change",e=>readImportFile(e.target.files[0]).catch(err=>{log("Gagal membaca file.",err.message);alert(err.message);}));
+  $("btnDryRun").addEventListener("click",()=>runImport(true).catch(e=>{log("Dry run gagal.",e.message);alert(e.message);}));
+  $("btnImport").addEventListener("click",()=>{if(confirm("Import akan menulis data ke Odoo. Lanjutkan?"))runImport(false).catch(e=>{log("Import gagal.",e.message);alert(e.message);});});
+  $("btnExportTemplate").addEventListener("click",()=>exportTemplate().catch(e=>{log("Export template gagal.",e.message);alert(e.message);}));
+  $("btnAudit").addEventListener("click",()=>exportAudit().catch(e=>{log("Audit gagal.",e.message);alert(e.message);}));
+  const drop=$("drop");drop.addEventListener("click",()=>$("importFile").click());drop.addEventListener("dragover",e=>{e.preventDefault();drop.classList.add("drag");});drop.addEventListener("dragleave",()=>drop.classList.remove("drag"));drop.addEventListener("drop",e=>{e.preventDefault();drop.classList.remove("drag");readImportFile(e.dataTransfer.files[0]).catch(err=>{log("Gagal membaca file.",err.message);alert(err.message);});});
   renderAll();
 })();
 </script>
