@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Lokalmart Odoo Command Center V9</title>
+  <style>
+    :root{--bg:#070914;--card:rgba(255,255,255,.08);--line:rgba(255,255,255,.14);--text:#f8fbff;--muted:#b9c3dc;--green:#30e39a;--orange:#ffb02e;--purple:#b987ff;--red:#ff6170}
+    *{box-sizing:border-box} body{margin:0;color:var(--text);font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;background:radial-gradient(circle at 10% 4%,rgba(255,176,46,.26),transparent 30%),radial-gradient(circle at 90% 10%,rgba(185,135,255,.22),transparent 30%),linear-gradient(135deg,#070914,#111827 60%,#170f25)}
+    .wrap{max-width:1260px;margin:0 auto;padding:22px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}.card{border:1px solid var(--line);background:linear-gradient(180deg,rgba(255,255,255,.105),rgba(255,255,255,.055));border-radius:28px;box-shadow:0 24px 70px rgba(0,0,0,.32);backdrop-filter:blur(18px);padding:20px;margin-bottom:16px}.hero{display:grid;grid-template-columns:1.2fr .8fr;gap:16px}.badge{display:inline-flex;gap:8px;align-items:center;border:1px solid var(--line);background:rgba(255,255,255,.08);border-radius:999px;padding:8px 12px;font-weight:900;color:#e8efff;font-size:13px;margin-bottom:14px}.dot{width:10px;height:10px;border-radius:99px;background:var(--green);box-shadow:0 0 18px var(--green)}h1{margin:0 0 14px;font-size:clamp(32px,5vw,58px);line-height:.95;letter-spacing:-.055em}h2{margin:0 0 10px;font-size:22px}p{margin:0 0 14px;color:var(--muted);line-height:1.55}label{display:block;font-size:12px;color:#dce5fb;font-weight:900;letter-spacing:.06em;text-transform:uppercase}input,textarea,select{width:100%;margin-top:6px;border:1px solid var(--line);border-radius:14px;background:rgba(0,0,0,.26);color:var(--text);padding:12px 13px;outline:none;font:inherit}textarea{min-height:250px;resize:vertical}.formgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.btns{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}button,a.btn{border:0;border-radius:999px;padding:12px 16px;font-weight:950;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;color:#06130e;background:#fff;box-shadow:0 12px 34px rgba(0,0,0,.26)}.primary{background:linear-gradient(135deg,var(--green),#d7ff71)}.orange{background:linear-gradient(135deg,var(--orange),#ffe17e)}.ghost{background:rgba(255,255,255,.08);color:#fff;border:1px solid var(--line);box-shadow:none}pre{white-space:pre-wrap;word-break:break-word;background:rgba(0,0,0,.28);border:1px solid var(--line);border-radius:18px;padding:14px;color:#dfe7ff;max-height:420px;overflow:auto}.pill{display:inline-flex;border:1px solid var(--line);border-radius:999px;padding:6px 10px;background:rgba(255,255,255,.075);color:#dfe7ff;font-size:12px;font-weight:850;margin:3px}.small{font-size:12px;color:var(--muted)}@media(max-width:900px){.grid,.hero,.formgrid{grid-template-columns:1fr}.wrap{padding:14px}.card{border-radius:22px}}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <section class="hero">
+    <div class="card">
+      <div class="badge"><span class="dot"></span> Lokalmart Odoo Command Center V9</div>
+      <h1>Importer, exporter, schema scanner, dan gap report dalam satu app.</h1>
+      <p>Tujuannya: ChatGPT bisa membuat XLSX yang sesuai keadaan Odoo Anda, lalu Vercel melaporkan data yang sudah ada, field yang kurang, view yang belum lengkap, dan record yang perlu dilengkapi.</p>
+      <div class="btns"><button class="primary" id="btnHealth">Test koneksi</button><button class="orange" id="btnSchema">Scan Schema</button><button class="ghost" id="btnGap">Gap Report XLSX</button><button class="ghost" id="btnExport">Export Profile XLSX</button></div>
+    </div>
+    <div class="card">
+      <h2>Koneksi Odoo</h2>
+      <div class="formgrid"><label>Odoo URL<input id="baseUrl" value="https://edu-lokalmart.odoo.com"/></label><label>Database<input id="db" placeholder="database"/></label><label>Login<input id="login" placeholder="email admin"/></label><label>Password/API Key<input id="password" type="password"/></label></div>
+      <p class="small" style="margin-top:10px">Credential tidak disimpan. Gunakan API Key admin untuk operasi besar.</p>
+    </div>
+  </section>
+
+  <section class="grid">
+    <div class="card">
+      <h2>Profile Export</h2>
+      <div class="formgrid"><label>Profile<select id="profile"><option value="portal">portal</option><option value="website">website</option><option value="products">products</option><option value="projects">projects</option><option value="lokalmart">lokalmart x_lm_*</option><option value="all_small" selected>all_small</option></select></label><label>Limit<input id="limit" type="number" value="300" min="1" max="1500"/></label></div>
+      <label style="margin-top:12px">Arch/QWeb<select id="includeArch"><option value="yes" selected>include</option><option value="no">exclude</option></select></label>
+      <p class="small" style="margin-top:10px">Untuk menghindari timeout Vercel, gunakan profile kecil dan limit 100–300.</p>
+    </div>
+    <div class="card">
+      <h2>Import Preview</h2>
+      <p>Upload XLSX buatan ChatGPT sebelum import. App akan cek kolom wajib, model, dan field yang tidak ada.</p>
+      <input id="file" type="file" accept=".xlsx,.xls"/>
+      <div class="btns"><button class="primary" id="btnPreview">Preview XLSX</button></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Model List</h2>
+    <p>Model untuk scan/gap report. Bisa disesuaikan.</p>
+    <textarea id="modelList">ir.ui.view
+website.page
+website.menu
+product.template
+product.product
+product.category
+res.partner
+project.project
+project.task
+sale.order
+sale.order.line
+account.move
+account.move.line
+payment.provider
+payment.transaction
+loyalty.program
+loyalty.card
+x_lm_koloni
+x_lm_lokal_identity
+x_lm_product_passport
+x_lm_service
+x_lm_survey
+x_lm_program
+x_lm_role_assignment</textarea>
+  </section>
+
+  <section class="card">
+    <h2>Log & Hasil</h2>
+    <pre id="log">Siap.</pre>
+  </section>
+</div>
+<script>
+const $=id=>document.getElementById(id);
+function log(msg,data){$('log').textContent=`[${new Date().toLocaleTimeString()}] ${msg}`+(data?"\n"+(typeof data==='string'?data:JSON.stringify(data,null,2)):'')+"\n\n"+$('log').textContent;}
+function creds(){return{baseUrl:$('baseUrl').value.trim().replace(/\/+$/,''),db:$('db').value.trim(),login:$('login').value.trim(),password:$('password').value};}
+function models(){return $('modelList').value.split(/\n|,/).map(x=>x.trim()).filter(Boolean);}
+async function postJson(url,body){const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const t=await r.text();let p;try{p=JSON.parse(t)}catch(e){p={raw:t}};if(!r.ok||p.ok===false)throw new Error(p.error||t);return p;}
+async function download(url,body,prefix){const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});if(!r.ok){const t=await r.text();throw new Error(t.slice(0,3000));}const blob=await r.blob();let name=`${prefix}_${new Date().toISOString().slice(0,10)}.xlsx`;const cd=r.headers.get('content-disposition')||'';const m=cd.match(/filename="?([^"]+)"?/i);if(m)name=m[1];const u=URL.createObjectURL(blob);const a=document.createElement('a');a.href=u;a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(u);a.remove();},1000);log('Download berhasil',{name,size:blob.size});}
+$('btnHealth').onclick=()=>postJson('/api/health',creds()).then(r=>log('Koneksi OK',r)).catch(e=>log('Koneksi gagal',e.message));
+$('btnSchema').onclick=()=>postJson('/api/schema-scan',{...creds(),modelList:models()}).then(r=>log('Schema scan selesai',r)).catch(e=>log('Schema scan gagal',e.message));
+$('btnGap').onclick=()=>download('/api/gap-report',{...creds(),modelList:models(),limit:Number($('limit').value||300)},'gap_report').catch(e=>log('Gap report gagal',e.message));
+$('btnExport').onclick=()=>download('/api/export-profile',{...creds(),modelList:models(),profile:$('profile').value,limit:Number($('limit').value||300),includeArch:$('includeArch').value==='yes'},'export_profile').catch(e=>log('Export gagal',e.message));
+$('btnPreview').onclick=async()=>{try{const f=$('file').files[0];if(!f)throw new Error('Pilih file XLSX dulu.');const b64=await new Promise((resolve,reject)=>{const fr=new FileReader();fr.onload=()=>resolve(fr.result);fr.onerror=reject;fr.readAsDataURL(f);});const r=await postJson('/api/import-preview',{...creds(),fileBase64:b64});log('Preview selesai',r);}catch(e){log('Preview gagal',e.message)}};
+</script>
+</body>
+</html>

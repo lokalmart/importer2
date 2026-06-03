@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Lokalmart Image Import V10</title>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <style>
+    :root{--bg:#070914;--card:rgba(255,255,255,.08);--line:rgba(255,255,255,.14);--text:#f8fbff;--muted:#b9c3dc;--green:#30e39a;--orange:#ffb02e;--red:#ff6170}
+    *{box-sizing:border-box}
+    body{margin:0;min-height:100vh;color:var(--text);font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;background:radial-gradient(circle at 12% 8%,rgba(255,176,46,.24),transparent 30%),radial-gradient(circle at 88% 12%,rgba(185,135,255,.22),transparent 30%),linear-gradient(135deg,#070914,#111827 60%,#170f25)}
+    .wrap{max-width:1180px;margin:0 auto;padding:22px}
+    .hero{display:grid;grid-template-columns:1.1fr .9fr;gap:16px;margin-bottom:16px}
+    .card{border:1px solid var(--line);background:linear-gradient(180deg,rgba(255,255,255,.105),rgba(255,255,255,.055));border-radius:28px;box-shadow:0 24px 70px rgba(0,0,0,.32);backdrop-filter:blur(18px);padding:20px;overflow:hidden}
+    .badge{display:inline-flex;gap:8px;align-items:center;border:1px solid var(--line);background:rgba(255,255,255,.08);border-radius:999px;padding:8px 12px;font-weight:900;color:#e8efff;font-size:13px;margin-bottom:14px}
+    .dot{width:10px;height:10px;border-radius:99px;background:var(--green);box-shadow:0 0 18px var(--green)}
+    h1{margin:0 0 14px;font-size:clamp(32px,5vw,56px);line-height:.95;letter-spacing:-.055em}
+    h2{margin:0 0 10px;font-size:22px}
+    p{margin:0 0 14px;color:var(--muted);line-height:1.55}
+    label{display:block;font-size:12px;color:#dce5fb;font-weight:900;letter-spacing:.06em;text-transform:uppercase}
+    input,textarea,select{width:100%;margin-top:6px;border:1px solid var(--line);border-radius:14px;background:rgba(0,0,0,.26);color:var(--text);padding:12px 13px;outline:none;font:inherit}
+    textarea{min-height:170px;resize:vertical}
+    .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    .btns{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+    button,a.btn{border:0;border-radius:999px;padding:12px 16px;font-weight:950;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;color:#06130e;background:#fff;box-shadow:0 12px 34px rgba(0,0,0,.26)}
+    .primary{background:linear-gradient(135deg,var(--green),#d7ff71)}
+    .orange{background:linear-gradient(135deg,var(--orange),#ffe17e)}
+    .ghost{background:rgba(255,255,255,.08);color:#fff;border:1px solid var(--line);box-shadow:none}
+    pre{white-space:pre-wrap;word-break:break-word;background:rgba(0,0,0,.28);border:1px solid var(--line);border-radius:18px;padding:14px;color:#dfe7ff;max-height:360px;overflow:auto}
+    table{width:100%;border-collapse:collapse;margin-top:12px;font-size:13px}td,th{border-bottom:1px solid var(--line);padding:8px;text-align:left}th{color:#aeb8d4;text-transform:uppercase;letter-spacing:.06em;font-size:11px}
+    .small{font-size:12px;color:var(--muted)}
+    @media(max-width:900px){.hero,.grid2{grid-template-columns:1fr}.wrap{padding:14px}.card{border-radius:22px}}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <section class="hero">
+    <div class="card">
+      <div class="badge"><span class="dot"></span> Lokalmart Image Import V10</div>
+      <h1>Import foto produk langsung dari XLSX ke Odoo.</h1>
+      <p>Gunakan kolom <b>image_url</b>, <b>image_base64</b>, atau <b>image_filename</b>. Untuk foto lokal, pilih file gambar lalu XLSX cukup menulis nama filenya.</p>
+      <div class="btns">
+        <button class="primary" id="btnParse">Baca XLSX</button>
+        <button class="orange" id="btnImport" disabled>Import Foto ke Odoo</button>
+        <a class="btn ghost" href="/command-center.html">Command Center</a>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Koneksi Odoo</h2>
+      <div class="grid2">
+        <label>Odoo URL<input id="baseUrl" value="https://edu-lokalmart.odoo.com"/></label>
+        <label>Database<input id="db" placeholder="nama database"/></label>
+        <label>Login Admin<input id="login" placeholder="email admin"/></label>
+        <label>Password / API Key<input id="password" type="password" placeholder="password/API key"/></label>
+      </div>
+      <p class="small" style="margin-top:10px">Image dikirim sebagai base64 ke field seperti <b>image_1920</b>. API key lebih aman daripada password.</p>
+    </div>
+  </section>
+
+  <section class="grid2">
+    <div class="card">
+      <h2>File XLSX & Foto Lokal</h2>
+      <label>File XLSX
+        <input id="xlsxFile" type="file" accept=".xlsx,.xls"/>
+      </label>
+      <label style="margin-top:12px">Folder/file gambar lokal opsional
+        <input id="imageFiles" type="file" accept="image/*" multiple/>
+      </label>
+      <div class="grid2" style="margin-top:12px">
+        <label>Default Model
+          <select id="defaultModel">
+            <option value="product.template" selected>product.template</option>
+            <option value="product.product">product.product</option>
+            <option value="res.partner">res.partner</option>
+            <option value="x_lm_product_passport">x_lm_product_passport</option>
+          </select>
+        </label>
+        <label>Target Image Field
+          <input id="targetField" value="image_1920"/>
+        </label>
+      </div>
+      <label style="margin-top:12px">
+        <input id="createMissing" type="checkbox" style="width:auto;margin-right:8px"/>
+        Create missing product sederhana jika tidak ditemukan
+      </label>
+      <p class="small">Embedded image yang ditempel di Excel belum otomatis dibaca. Pakai <b>image_url</b>, <b>image_filename</b>, atau <b>image_base64</b>.</p>
+    </div>
+
+    <div class="card">
+      <h2>Format Kolom XLSX</h2>
+      <pre>model              opsional, default product.template
+default_code       SKU produk
+barcode            barcode produk
+name               nama produk/partner
+match_field        opsional
+match_value        opsional
+target_field       default image_1920
+image_url          URL publik gambar
+image_filename     nama file lokal yang dipilih
+image_base64       base64 langsung</pre>
+    </div>
+  </section>
+
+  <section class="card" style="margin-top:16px">
+    <h2>Preview & Log</h2>
+    <pre id="log">Siap.</pre>
+    <div id="preview"></div>
+  </section>
+</div>
+
+<script>
+(function(){
+  const $ = id => document.getElementById(id);
+  let rows = [];
+  let fileMap = new Map();
+
+  function log(msg, data){
+    const line = `[${new Date().toLocaleTimeString()}] ${msg}` + (data ? "\n" + (typeof data === "string" ? data : JSON.stringify(data,null,2)) : "");
+    $("log").textContent = line + "\n\n" + $("log").textContent;
+  }
+
+  function creds(){
+    return {
+      baseUrl:$("baseUrl").value.trim().replace(/\/+$/,""),
+      db:$("db").value.trim(),
+      login:$("login").value.trim(),
+      password:$("password").value
+    };
+  }
+
+  function fileToBase64(file){
+    return new Promise((resolve,reject)=>{
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result || ""));
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
+  async function buildFileMap(){
+    fileMap = new Map();
+    const files = Array.from($("imageFiles").files || []);
+    for(const file of files){
+      fileMap.set(file.name, file);
+      fileMap.set(file.name.toLowerCase(), file);
+    }
+  }
+
+  async function parseXlsx(){
+    const file = $("xlsxFile").files[0];
+    if(!file) throw new Error("Pilih file XLSX dulu.");
+
+    await buildFileMap();
+
+    const data = await file.arrayBuffer();
+    const wb = XLSX.read(data, {type:"array"});
+    const sheetName = wb.SheetNames[0];
+    const sheet = wb.Sheets[sheetName];
+    rows = XLSX.utils.sheet_to_json(sheet, {defval:""});
+
+    const defaultModel = $("defaultModel").value;
+    const targetField = $("targetField").value || "image_1920";
+
+    rows = rows.map((r, idx) => {
+      const out = {...r};
+      out.model = out.model || out._model || defaultModel;
+      out.target_field = out.target_field || out.image_field || targetField;
+      out._row_index = idx + 2;
+      return out;
+    }).filter(r => r.image_url || r.image_base64 || r.image_1920 || r.image_filename || r.photo_filename || r.foto_filename);
+
+    $("btnImport").disabled = rows.length === 0;
+
+    renderPreview();
+    log("XLSX dibaca.", {sheet:sheetName, rows:rows.length, local_images:fileMap.size});
+  }
+
+  function renderPreview(){
+    const preview = $("preview");
+    const sample = rows.slice(0,20);
+    if(!sample.length){
+      preview.innerHTML = "<p class='small'>Belum ada row image.</p>";
+      return;
+    }
+    preview.innerHTML = "<table><thead><tr><th>Row</th><th>Model</th><th>Match</th><th>Image</th></tr></thead><tbody>" +
+      sample.map(r => {
+        const match = r.match_field && r.match_value ? `${r.match_field}=${r.match_value}` :
+          r.default_code ? `default_code=${r.default_code}` :
+          r.barcode ? `barcode=${r.barcode}` :
+          r.name ? `name=${r.name}` : "-";
+        const image = r.image_url || r.image_filename || r.photo_filename || r.foto_filename || (r.image_base64 || r.image_1920 ? "base64" : "-");
+        return `<tr><td>${r._row_index}</td><td>${r.model}</td><td>${match}</td><td>${image}</td></tr>`;
+      }).join("") + "</tbody></table>";
+  }
+
+  async function rowsWithLocalBase64(batch){
+    const out = [];
+    for(const row of batch){
+      const r = {...row};
+      const filename = r.image_filename || r.photo_filename || r.foto_filename || "";
+      if(filename && !r.image_url && !r.image_base64 && !r.image_1920){
+        const file = fileMap.get(filename) || fileMap.get(String(filename).toLowerCase());
+        if(file){
+          r.image_base64 = await fileToBase64(file);
+        }
+      }
+      out.push(r);
+    }
+    return out;
+  }
+
+  async function importImages(){
+    if(!rows.length) throw new Error("Tidak ada row image.");
+    const chunkSize = 10;
+    let summary = {total:0, updated:0, error:0, created:0};
+
+    for(let i=0;i<rows.length;i+=chunkSize){
+      const batch = await rowsWithLocalBase64(rows.slice(i,i+chunkSize));
+      log(`Import batch ${i+1}-${i+batch.length}...`);
+
+      const response = await fetch("/api/import-images", {
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({
+          ...creds(),
+          createMissing:$("createMissing").checked,
+          rows:batch
+        })
+      });
+
+      const payload = await response.json();
+      if(!response.ok || !payload.ok) throw new Error(payload.error || "Import gagal.");
+
+      summary.total += payload.summary.total || 0;
+      summary.updated += payload.summary.updated || 0;
+      summary.error += payload.summary.error || 0;
+      summary.created += payload.summary.created || 0;
+      log("Batch selesai.", payload.summary);
+      if(payload.summary.error){
+        log("Detail error batch.", payload.results.filter(r=>r.status==="error"));
+      }
+    }
+
+    log("Import foto selesai.", summary);
+    alert(`Import selesai. Updated: ${summary.updated}, Error: ${summary.error}`);
+  }
+
+  $("btnParse").addEventListener("click", () => parseXlsx().catch(e => {log("Gagal baca XLSX.", e.message); alert(e.message);}));
+  $("btnImport").addEventListener("click", () => importImages().catch(e => {log("Import gagal.", e.message); alert(e.message);}));
+})();
+</script>
+</body>
+</html>
