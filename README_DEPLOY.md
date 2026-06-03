@@ -1,36 +1,68 @@
-# Lokalmart Odoo Page Scanner V3
+# Lokalmart Odoo Page Scanner + Importer V4
 
-Scanner ini dibuat untuk memperbaiki masalah page `/scan` yang tidak muncul saat memakai XLSX biasa.
+Versi V4 mengembalikan fitur import yang sempat hilang di V3.
 
-## Fungsi utama
+## Fitur
 
-1. Scan model `website.page`, `website.menu`, `ir.ui.view`, dan `website.controller.page` jika model tersedia.
-2. Deteksi halaman yang belum ada, terutama `/scan`.
-3. Membuat atau memperbarui `/scan` langsung lewat Odoo RPC dengan cara aman:
-   - prioritas: update `website.page` berdasarkan `url`;
-   - jika belum ada: create `website.page` langsung dengan `name`, `type`, `key`, `arch_db`, `url`;
-   - fallback: create `ir.ui.view`, lalu create `website.page` dengan `view_id`.
-4. Membuat menu `/scan` jika diperlukan.
-5. Export hasil scan menjadi XLSX dari browser.
+- Test koneksi Odoo JSON-RPC
+- Scan `website.page`, `website.menu`, `ir.ui.view`, dan `website.controller.page` jika ada
+- Deteksi halaman target yang belum ada
+- Upsert halaman `/scan` langsung ke Odoo
+- Export hasil scan ke XLSX
+- Import XLSX/JSON ke Odoo untuk model:
+  - `website.page`
+  - `ir.ui.view`
+  - `website.menu`
 
-## Cara deploy ke Vercel
+## Struktur deploy
 
-1. Upload folder ini ke GitHub atau Vercel.
-2. Jalankan deploy Vercel.
-3. Buka URL Vercel.
-4. Isi:
-   - Odoo URL: `https://edu-lokalmart.odoo.com`
-   - Database: nama database Odoo Anda
-   - Login: email admin Odoo
-   - Password/API key: password atau API key
-5. Klik `Test`.
-6. Klik `Scan Semua Pages`.
-7. Klik `Upsert /scan`.
+Pastikan root repository berisi:
 
-## Catatan Odoo Online
+```txt
+api/odoo.js
+public/index.html
+package.json
+README_DEPLOY.md
+lokalmart_page_scan_direct_import_v3.xlsx
+```
 
-External API Odoo bisa tergantung paket/izin. Jika login gagal dari Vercel, gunakan import XLSX `lokalmart_page_scan_direct_import_v3.xlsx` sebagai fallback, atau buat API key dari akun admin Odoo.
+Jangan sampai masuk ke folder ganda seperti:
 
-## Kenapa bukan hanya XLSX?
+```txt
+lokalmart_odoo_page_scanner_v4_package/public/index.html
+```
 
-Halaman website Odoo bukan sekadar row menu. Page terkait dengan `website.page` dan `ir.ui.view`. Di banyak database Odoo, import XLSX yang hanya memisahkan view dan page bisa gagal silent karena external ID relasi `view_id` tidak cocok. V3 mencoba membuat record page langsung dengan field view turunan (`arch_db`, `key`, `type`) lalu fallback ke `ir.ui.view`.
+Kalau memakai GitHub upload, buka isi folder hasil extract, lalu upload file/folder di dalamnya ke root repository.
+
+## Cara pakai
+
+1. Deploy ke Vercel.
+2. Buka URL Vercel.
+3. Isi Odoo URL, database, login admin, dan password/API key.
+4. Klik **Test koneksi**.
+5. Klik **Scan Semua Pages**.
+6. Untuk membuat halaman scanner, klik **Upsert /scan**.
+7. Untuk import file, klik **Import XLSX/JSON** lalu pilih file impor.
+
+## Format XLSX import
+
+Nama sheet harus mengandung salah satu teks berikut:
+
+- `website.page`
+- `ir.ui.view`
+- `website.menu`
+
+Contoh sheet yang diterima:
+
+- `10_IMPORT_website.page_DIRECT`
+- `50_IMPORT_website.page`
+- `20_website.menu_IMPORT`
+- `30_ir.ui.view_IMPORT`
+
+Importer akan melakukan upsert:
+
+- `website.page`: dicari dari `url`, lalu `key`
+- `ir.ui.view`: dicari dari `key`, lalu `name`
+- `website.menu`: dicari dari `url`, lalu `name`
+
+Kolom `id` diabaikan oleh RPC importer karena itu biasanya External ID milik importer bawaan Odoo, bukan field database langsung.
