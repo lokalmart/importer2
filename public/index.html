@@ -214,8 +214,102 @@ ir.model.data</textarea>
   function groupSortPriority(model){return({"ir.model":1,"ir.model.fields":2,"ir.ui.view":3,"website.page":4,"website.menu":5,"res.partner":10,"product.category":11,"product.template":12,"product.product":13,"project.project":20,"project.milestone":21,"project.task":22,"account.analytic.account":30,"account.analytic.line":31,"slide.channel":40,"slide.slide":41,"crm.lead":50}[model]||100);}
   async function runImport(dryRun){if(!state.groups.length){alert("Belum ada file. Pilih XLSX/JSON dulu.");return;}await testConnection();state.results=[];renderResults();const groups=[...state.groups].sort((a,b)=>groupSortPriority(a.model)-groupSortPriority(b.model));log(dryRun?"Dry run dimulai.":"Import dimulai.",{groups:groups.map(g=>({model:g.model,rows:g.rows.length}))});for(const group of groups){for(let i=0;i<group.rows.length;i++){const rawRow=group.rows[i],model=String(rawRow._model||group.model||"").trim();try{const result=await importOneRow(model,rawRow,dryRun);state.results.push(result);log(`${result.status.toUpperCase()} ${model}`,result);}catch(e){const result={model,action:rawRow._action||"upsert",status:"error",id:"",external_id:rawRow._external_id||rawRow.id||"",message:e.message};state.results.push(result);warn(`Gagal import ${model} row ${i+1}.`,{error:e.message,row:rawRow});}renderResults();renderKpis();}}log(dryRun?"Dry run selesai.":"Import selesai.",{total:state.results.length,created:state.results.filter(r=>r.status==="created").length,updated:state.results.filter(r=>r.status==="updated").length,error:state.results.filter(r=>r.status==="error").length});alert(dryRun?"Dry run selesai. Lihat Result/Log.":"Import selesai. Lihat Result/Log.");}
   async function exportTemplate(){const XLSXLib=await getXLSX();const wb=XLSXLib.utils.book_new();XLSXLib.utils.book_append_sheet(wb,XLSXLib.utils.aoa_to_sheet([["Lokalmart Universal Importer V7"],["Sheet gunakan nama model Odoo."],["Kolom khusus: _action, _external_id, _match, _model"]]),"00_README");XLSXLib.utils.book_append_sheet(wb,XLSXLib.utils.json_to_sheet([{_action:"upsert",_external_id:"lokalmart_importer.project_ground_zero",_match:"name",name:"Ground Zero Lokalmart",description:"Project induk Lokalmart."}]),"project.project");XLSXLib.utils.book_append_sheet(wb,XLSXLib.utils.json_to_sheet([{_action:"upsert",_external_id:"lokalmart_importer.task_scan_page",_match:"name,project_id",name:"Bangun halaman /scan Lokalmart",project_id:"Ground Zero Lokalmart",description:"Membuat page scan barcode, QR, dan Lokal ID.",priority:"1"}]),"project.task");XLSXLib.writeFile(wb,"lokalmart_universal_import_template_v7.xlsx");}
-  async function exportAudit(){const creds=getCreds();if(!creds.baseUrl||!creds.db||!creds.login||!creds.password){alert("Lengkapi koneksi Odoo dulu.");return;}const mode=$("auditMode").value;const body={...creds,modelList:$("auditModelList").value.split(/\n|,/).map(x=>x.trim()).filter(Boolean),limit:Number($("auditLimit").value||1500),includeArch:mode!=="light",includeAllFields:mode==="allfields"};log("Export Full Autopsy XLSX dimulai.",body);const res=await fetch("/api/audit",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});if(!res.ok){let msg="Audit gagal.";try{const j=await res.json();msg=j.error||msg;log("Audit gagal.",j);}catch(e){msg=await res.text();log("Audit gagal.",msg);}throw new Error(msg);}const blob=await res.blob();const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=`lokalmart_odoo_full_autopsy_${new Date().toISOString().slice(0,10)}.xlsx`;document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url);log("Export Full Autopsy XLSX selesai. Upload file hasil export ke ChatGPT agar bisa saya audit detail.");}
-  document.querySelectorAll(".tab").forEach(btn=>btn.addEventListener("click",()=>{document.querySelectorAll(".tab").forEach(b=>b.classList.remove("active"));btn.classList.add("active");["preview","models","fields","result","log"].forEach(t=>$("tab-"+t).classList.toggle("hidden",t!==btn.dataset.tab));}));
+async function exportFullAudit(){
+  log("Mulai export full autopsy Odoo...");
+
+  const modelText = $("auditModelList")
+    ? $("auditModelList").value
+    : $("modelList").value;
+
+  const modelList = modelText
+    .split(/\n|,/)
+    .map(x => x.trim())
+    .filter(Boolean);
+
+  const limit = $("auditLimit") ? Number($("auditLimit").value || 1500) : 1500;
+  const auditMode = $("auditMode") ? $("auditMode").value : "normal";
+
+  const includeArch = auditMode !== "light";
+  const includeAllFields = auditMode === "all";
+
+  const payload = {
+    ...getCreds(),
+    modelList,
+    limit,
+    includeArch,
+    includeAllFields
+  };
+
+  const response = await fetch("/api/audit", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(payload)
+  });
+
+  const contentType = response.headers.get("content-type") || "";
+
+  if (!response.ok) {
+    let message = `Audit gagal. HTTP ${response.status}`;
+
+    try {
+      const errorText = await response.text();
+
+      if (contentType.includes("application/json")) {
+        try {
+          const errorJson = JSON.parse(errorText);
+          message = errorJson.error || errorJson.message || errorText;
+        } catch (jsonErr) {
+          message = errorText;
+        }
+      } else {
+        message = errorText;
+      }
+    } catch (readErr) {
+      message = `Audit gagal dan error response tidak bisa dibaca: ${readErr.message}`;
+    }
+
+    throw new Error(message.slice(0, 3000));
+  }
+
+  const blob = await response.blob();
+
+  if (!blob || blob.size === 0) {
+    throw new Error("Audit berhasil dipanggil, tetapi file XLSX kosong.");
+  }
+
+  let filename = `lokalmart_odoo_full_autopsy_${new Date().toISOString().slice(0,10)}.xlsx`;
+
+  const disposition = response.headers.get("content-disposition") || "";
+  const filenameMatch = disposition.match(/filename="?([^"]+)"?/i);
+
+  if (filenameMatch && filenameMatch[1]) {
+    filename = filenameMatch[1];
+  }
+
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+
+  setTimeout(function(){
+    URL.revokeObjectURL(url);
+    a.remove();
+  }, 1000);
+
+  log("Audit XLSX berhasil diexport.", {
+    filename,
+    size_bytes: blob.size,
+    models: modelList.length,
+    limit,
+    includeArch,
+    includeAllFields
+  });
+}  document.querySelectorAll(".tab").forEach(btn=>btn.addEventListener("click",()=>{document.querySelectorAll(".tab").forEach(b=>b.classList.remove("active"));btn.classList.add("active");["preview","models","fields","result","log"].forEach(t=>$("tab-"+t).classList.toggle("hidden",t!==btn.dataset.tab));}));
   $("btnTest").addEventListener("click",()=>testConnection().then(()=>alert("Koneksi berhasil.")).catch(e=>{log("Test koneksi gagal.",e.message);alert(e.message);}));
   $("btnScanModels").addEventListener("click",()=>scanModels().catch(e=>{log("Scan models gagal.",e.message);alert(e.message);}));
   $("btnChooseImport").addEventListener("click",()=>$("importFile").click());
@@ -223,8 +317,12 @@ ir.model.data</textarea>
   $("btnDryRun").addEventListener("click",()=>runImport(true).catch(e=>{log("Dry run gagal.",e.message);alert(e.message);}));
   $("btnImport").addEventListener("click",()=>{if(confirm("Import akan menulis data ke Odoo. Lanjutkan?"))runImport(false).catch(e=>{log("Import gagal.",e.message);alert(e.message);});});
   $("btnExportTemplate").addEventListener("click",()=>exportTemplate().catch(e=>{log("Export template gagal.",e.message);alert(e.message);}));
-  $("btnAudit").addEventListener("click",()=>exportAudit().catch(e=>{log("Audit gagal.",e.message);alert(e.message);}));
-  const drop=$("drop");drop.addEventListener("click",()=>$("importFile").click());drop.addEventListener("dragover",e=>{e.preventDefault();drop.classList.add("drag");});drop.addEventListener("dragleave",()=>drop.classList.remove("drag"));drop.addEventListener("drop",e=>{e.preventDefault();drop.classList.remove("drag");readImportFile(e.dataTransfer.files[0]).catch(err=>{log("Gagal membaca file.",err.message);alert(err.message);});});
+$("btnAudit").addEventListener("click", function(){
+  exportFullAudit().catch(function(e){
+    log("Audit gagal.", e.message);
+    alert(e.message);
+  });
+});  const drop=$("drop");drop.addEventListener("click",()=>$("importFile").click());drop.addEventListener("dragover",e=>{e.preventDefault();drop.classList.add("drag");});drop.addEventListener("dragleave",()=>drop.classList.remove("drag"));drop.addEventListener("drop",e=>{e.preventDefault();drop.classList.remove("drag");readImportFile(e.dataTransfer.files[0]).catch(err=>{log("Gagal membaca file.",err.message);alert(err.message);});});
   renderAll();
 })();
 </script>
