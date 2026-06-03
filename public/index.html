@@ -1,1 +1,555 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Lokalmart Odoo Page Scanner V3</title>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <style>
+    :root{
+      --bg:#080b14; --panel:rgba(255,255,255,.075); --panel2:rgba(255,255,255,.105);
+      --text:#f7f7fb; --muted:#b7bed2; --line:rgba(255,255,255,.14);
+      --green:#30e39a; --orange:#ff9f43; --red:#ff5f6d; --blue:#66d9ff; --purple:#b987ff;
+      --shadow: 0 20px 70px rgba(0,0,0,.42);
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0; color:var(--text); font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;
+      background:
+        radial-gradient(circle at 12% 10%, rgba(255,159,67,.28), transparent 34%),
+        radial-gradient(circle at 88% 18%, rgba(185,135,255,.22), transparent 30%),
+        radial-gradient(circle at 55% 92%, rgba(48,227,154,.18), transparent 28%),
+        linear-gradient(135deg,#070914,#111827 55%,#150d25);
+      min-height:100vh;
+    }
+    .wrap{max-width:1220px;margin:0 auto;padding:24px}
+    .hero{display:grid;grid-template-columns:1.1fr .9fr;gap:18px;align-items:stretch;margin-bottom:18px}
+    .card{
+      background:linear-gradient(180deg,rgba(255,255,255,.10),rgba(255,255,255,.055));
+      border:1px solid var(--line); border-radius:28px; box-shadow:var(--shadow);
+      backdrop-filter: blur(18px); padding:22px; overflow:hidden; position:relative;
+    }
+    .card::before{content:"";position:absolute;inset:-1px;border-radius:28px;pointer-events:none;background:linear-gradient(120deg,rgba(255,159,67,.34),transparent 28%,rgba(48,227,154,.20),transparent 70%,rgba(185,135,255,.27));opacity:.38;mask:linear-gradient(#000,#000) content-box,linear-gradient(#000,#000);-webkit-mask:linear-gradient(#000,#000) content-box,linear-gradient(#000,#000);padding:1px;-webkit-mask-composite:xor;mask-composite:exclude}
+    h1{font-size:clamp(30px,5vw,58px);line-height:.95;margin:0 0 14px;letter-spacing:-.055em}
+    h2{font-size:22px;margin:0 0 10px}
+    p{color:var(--muted);line-height:1.55;margin:0 0 14px}
+    .badge{display:inline-flex;align-items:center;gap:9px;border:1px solid var(--line);background:rgba(255,255,255,.07);border-radius:999px;padding:8px 12px;color:#dfe6ff;font-weight:800;font-size:13px;margin-bottom:14px}
+    .dot{width:10px;height:10px;background:var(--green);border-radius:99px;box-shadow:0 0 18px var(--green)}
+    .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+    .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    label{font-size:12px;color:#d7def5;font-weight:800;text-transform:uppercase;letter-spacing:.06em}
+    input,textarea,select{
+      width:100%;margin-top:6px;border:1px solid var(--line);border-radius:14px;background:rgba(0,0,0,.26);color:var(--text);
+      padding:12px 13px;outline:none;font:inherit;
+    }
+    textarea{min-height:96px;resize:vertical}
+    input:focus,textarea:focus{border-color:rgba(48,227,154,.6);box-shadow:0 0 0 4px rgba(48,227,154,.12)}
+    .btns{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+    button,.btn{
+      border:0;border-radius:999px;padding:12px 16px;font-weight:900;cursor:pointer;color:#07111c;background:#fff;
+      box-shadow:0 12px 34px rgba(0,0,0,.26);transition:.18s transform,.18s opacity;
+    }
+    button:hover{transform:translateY(-1px)}
+    button:disabled{opacity:.45;cursor:not-allowed;transform:none}
+    .primary{background:linear-gradient(135deg,var(--green),#c8ff6d);color:#07111c}
+    .orange{background:linear-gradient(135deg,var(--orange),#ffd166);color:#160d04}
+    .blue{background:linear-gradient(135deg,var(--blue),#c9f4ff);color:#06131c}
+    .purple{background:linear-gradient(135deg,var(--purple),#ff8edb);color:#13071d}
+    .danger{background:linear-gradient(135deg,var(--red),#ffb199);color:#210509}
+    .status{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px}
+    .kpi{padding:16px;border-radius:22px;border:1px solid var(--line);background:rgba(255,255,255,.06)}
+    .kpi b{display:block;font-size:30px;letter-spacing:-.04em}
+    .kpi span{display:block;color:var(--muted);font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.07em}
+    .tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+    .tab{background:rgba(255,255,255,.08);color:#eaf0ff;border:1px solid var(--line);box-shadow:none}
+    .tab.active{background:#fff;color:#07111c}
+    table{width:100%;border-collapse:separate;border-spacing:0 8px;font-size:13px}
+    th{color:#dbe2f6;text-align:left;font-size:12px;text-transform:uppercase;letter-spacing:.05em;padding:0 10px}
+    td{background:rgba(255,255,255,.065);border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:10px;vertical-align:top;color:#f3f6ff}
+    td:first-child{border-left:1px solid var(--line);border-radius:14px 0 0 14px}
+    td:last-child{border-right:1px solid var(--line);border-radius:0 14px 14px 0}
+    .pill{display:inline-flex;border-radius:999px;padding:4px 8px;font-size:11px;font-weight:900;border:1px solid var(--line);background:rgba(255,255,255,.08)}
+    .ok{color:#8dffcf}.warn{color:#ffd166}.bad{color:#ff9da7}.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+    pre{white-space:pre-wrap;word-break:break-word;background:rgba(0,0,0,.28);border:1px solid var(--line);border-radius:18px;padding:14px;color:#dfe7ff;max-height:340px;overflow:auto}
+    .small{font-size:12px;color:var(--muted)}
+    .hidden{display:none!important}
+    @media(max-width:900px){.hero,.grid2{grid-template-columns:1fr}.grid,.status{grid-template-columns:1fr 1fr}.wrap{padding:14px}.card{border-radius:22px;padding:16px}}
+    @media(max-width:580px){.grid,.status{grid-template-columns:1fr}.btns button{width:100%}}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <section class="hero">
+      <div class="card">
+        <div class="badge"><span class="dot"></span> Lokalmart Odoo Structure Scanner V3</div>
+        <h1>Scan semua page, deteksi yang hilang, lalu buat `/scan` langsung.</h1>
+        <p>Versi ini tidak hanya membaca fields. Ia membaca record `website.page`, `website.menu`, `ir.ui.view`, controller page jika tersedia, lalu bisa membuat halaman baru lewat RPC.</p>
+        <div class="btns">
+          <button class="primary" id="btnTest">Test koneksi</button>
+          <button class="blue" id="btnScan">Scan Semua Pages</button>
+          <button class="orange" id="btnUpsertScan">Upsert /scan</button>
+          <button class="purple" id="btnExport">Export XLSX</button>
+        </div>
+      </div>
+      <div class="card">
+        <h2>Koneksi Odoo</h2>
+        <div class="grid2">
+          <label>Odoo URL
+            <input id="baseUrl" value="https://edu-lokalmart.odoo.com" placeholder="https://edu-lokalmart.odoo.com"/>
+          </label>
+          <label>Database
+            <input id="db" placeholder="nama database Odoo"/>
+          </label>
+          <label>Login admin
+            <input id="login" placeholder="email admin Odoo"/>
+          </label>
+          <label>Password / API Key
+            <input id="password" type="password" placeholder="password atau API key"/>
+          </label>
+        </div>
+        <p class="small" style="margin-top:10px">Disarankan pakai API key admin. Kredensial tidak disimpan; hanya dikirim ke function Vercel Anda untuk request saat ini.</p>
+      </div>
+    </section>
 
+    <section class="status">
+      <div class="kpi"><b id="kpiPages">0</b><span>website.page</span></div>
+      <div class="kpi"><b id="kpiMenus">0</b><span>website.menu</span></div>
+      <div class="kpi"><b id="kpiViews">0</b><span>qweb views</span></div>
+      <div class="kpi"><b id="kpiMissing">0</b><span>missing target</span></div>
+    </section>
+
+    <section class="card">
+      <h2>Target halaman Lokalmart</h2>
+      <p>Daftar ini dipakai untuk mendeteksi halaman yang belum ada. Ubah sesuai kebutuhan lalu klik scan ulang.</p>
+      <textarea id="targets">/scan
+/cek-barcode
+/lokal-id
+/local-rewards
+/lokal-ojek
+/tentang-kami
+/shop</textarea>
+    </section>
+
+    <section class="card" style="margin-top:18px">
+      <div class="tabs">
+        <button class="tab active" data-tab="pages">Pages</button>
+        <button class="tab" data-tab="missing">Missing</button>
+        <button class="tab" data-tab="menus">Menus</button>
+        <button class="tab" data-tab="views">Views</button>
+        <button class="tab" data-tab="log">Log</button>
+      </div>
+      <div id="tab-pages"><div id="pagesTable"></div></div>
+      <div id="tab-missing" class="hidden"><div id="missingTable"></div></div>
+      <div id="tab-menus" class="hidden"><div id="menusTable"></div></div>
+      <div id="tab-views" class="hidden"><div id="viewsTable"></div></div>
+      <div id="tab-log" class="hidden"><pre id="log"></pre></div>
+    </section>
+  </div>
+
+<script>
+(function(){
+  const state = {
+    uid:null, pages:[], menus:[], views:[], controllers:[], fields:{}, missing:[], lastScanAt:null
+  };
+  const $ = (id)=>document.getElementById(id);
+  const log = (msg, data)=>{
+    const line = `[${new Date().toLocaleTimeString()}] ${msg}` + (data ? `\n${typeof data === "string" ? data : JSON.stringify(data,null,2)}` : "");
+    $("log").textContent = line + "\n\n" + $("log").textContent;
+  };
+  const getCreds = ()=>({
+    baseUrl: $("baseUrl").value.trim().replace(/\/+$/,""),
+    db: $("db").value.trim(),
+    login: $("login").value.trim(),
+    password: $("password").value
+  });
+
+  async function rpc(model, method, args=[], kwargs={}) {
+    const body = {...getCreds(), uid: state.uid, model, method, args, kwargs};
+    const res = await fetch("/api/odoo", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body)});
+    const payload = await res.json().catch(()=>({ok:false,error:"Invalid JSON response"}));
+    if (!payload.ok) throw new Error(payload.error || "RPC failed");
+    if (payload.uid) state.uid = payload.uid;
+    return payload.result;
+  }
+  async function test() {
+    const res = await fetch("/api/odoo", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(getCreds())});
+    const payload = await res.json();
+    if (!payload.ok) throw new Error(payload.error || "Auth failed");
+    state.uid = payload.uid;
+    log("Koneksi berhasil.", {uid: state.uid});
+    alert("Koneksi berhasil.");
+  }
+  async function modelExists(model) {
+    const found = await rpc("ir.model", "search_read", [[["model","=",model]]], {fields:["model","name"], limit:1});
+    return Array.isArray(found) && found.length > 0;
+  }
+  async function fieldsGet(model) {
+    if (state.fields[model]) return state.fields[model];
+    const fields = await rpc(model, "fields_get", [], {attributes:["string","type","required","readonly","relation","store"]});
+    state.fields[model] = fields || {};
+    return state.fields[model];
+  }
+  function existingFields(fieldMap, wanted) {
+    return wanted.filter(f => fieldMap[f]);
+  }
+  async function safeSearchRead(model, domain, wantedFields, limit=1000, order="id asc") {
+    if (!(await modelExists(model))) {
+      log(`Model tidak tersedia: ${model}`);
+      return [];
+    }
+    const fmap = await fieldsGet(model);
+    const fields = existingFields(fmap, wantedFields);
+    try {
+      return await rpc(model, "search_read", [domain], {fields, limit, order});
+    } catch (e) {
+      log(`search_read gagal pada ${model}, coba fallback tanpa field berat.`, e.message);
+      const lightweight = fields.filter(f => !["arch_db","arch_base"].includes(f));
+      return await rpc(model, "search_read", [domain], {fields: lightweight, limit, order});
+    }
+  }
+  async function scanAll() {
+    log("Mulai scan halaman website...");
+    const pageFields = [
+      "id","name","url","key","website_published","is_published","website_indexed","header_visible","footer_visible",
+      "website_id","view_id","is_in_menu","is_homepage","visibility","create_date","write_date",
+      "website_meta_title","website_meta_description","website_meta_keywords"
+    ];
+    const menuFields = ["id","name","url","page_id","parent_id","sequence","website_id","is_visible"];
+    const viewFields = ["id","name","key","type","mode","active","website_id","write_date","arch_db"];
+    const controllerFields = ["id","name","url","website_id","view_id","page_id","write_date"];
+
+    state.pages = await safeSearchRead("website.page", [], pageFields, 2000, "url asc");
+    state.menus = await safeSearchRead("website.menu", [], menuFields, 2000, "sequence asc");
+    state.views = await safeSearchRead("ir.ui.view", [["type","=","qweb"]], viewFields, 2000, "key asc");
+    state.controllers = await safeSearchRead("website.controller.page", [], controllerFields, 1000, "url asc");
+    detectMissing();
+    state.lastScanAt = new Date();
+    renderAll();
+    log("Scan selesai.", {pages:state.pages.length, menus:state.menus.length, views:state.views.length, controllers:state.controllers.length, missing:state.missing.length});
+  }
+  function normalizeRoute(x) {
+    x = String(x || "").trim();
+    if (!x) return "";
+    if (!x.startsWith("/")) x = "/" + x;
+    return x.replace(/\/+$/,"") || "/";
+  }
+  function targetRoutes() {
+    return $("targets").value.split(/\n|,/).map(normalizeRoute).filter(Boolean);
+  }
+  function detectMissing() {
+    const pageUrls = new Set(state.pages.map(p=>normalizeRoute(p.url)));
+    const menuUrls = new Set(state.menus.map(m=>normalizeRoute(m.url)));
+    const controllerUrls = new Set(state.controllers.map(c=>normalizeRoute(c.url)));
+    state.missing = targetRoutes().map(url => ({
+      url,
+      exists_page: pageUrls.has(url),
+      exists_menu: menuUrls.has(url),
+      exists_controller: controllerUrls.has(url),
+      status: pageUrls.has(url) ? "OK" : (controllerUrls.has(url) ? "Controller only" : "Missing website.page")
+    })).filter(x => !x.exists_page);
+  }
+  function esc(v) {
+    return String(v == null ? "" : v)
+      .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+  }
+  function table(rows, cols) {
+    if (!rows.length) return '<p class="small">Tidak ada data.</p>';
+    return `<table><thead><tr>${cols.map(c=>`<th>${esc(c.label)}</th>`).join("")}</tr></thead><tbody>` +
+      rows.map(r=>`<tr>${cols.map(c=>`<td>${c.render ? c.render(r) : esc(r[c.key])}</td>`).join("")}</tr>`).join("") +
+      `</tbody></table>`;
+  }
+  function renderAll() {
+    $("kpiPages").textContent = state.pages.length;
+    $("kpiMenus").textContent = state.menus.length;
+    $("kpiViews").textContent = state.views.length;
+    $("kpiMissing").textContent = state.missing.length;
+    $("pagesTable").innerHTML = table(state.pages, [
+      {key:"url", label:"URL", render:r=>`<span class="mono">${esc(r.url)}</span>`},
+      {key:"name", label:"Name"},
+      {key:"key", label:"Key", render:r=>`<span class="mono">${esc(r.key)}</span>`},
+      {key:"is_published", label:"Published", render:r=>r.is_published ? '<span class="pill ok">yes</span>' : '<span class="pill bad">no</span>'},
+      {key:"view_id", label:"View", render:r=>esc(Array.isArray(r.view_id) ? r.view_id.join(" / ") : r.view_id)},
+      {key:"write_date", label:"Write Date"}
+    ]);
+    $("missingTable").innerHTML = table(state.missing, [
+      {key:"url", label:"Missing URL", render:r=>`<span class="mono">${esc(r.url)}</span>`},
+      {key:"exists_menu", label:"Menu", render:r=>r.exists_menu ? '<span class="pill warn">menu ada</span>' : '<span class="pill bad">tidak ada</span>'},
+      {key:"exists_controller", label:"Controller", render:r=>r.exists_controller ? '<span class="pill warn">controller</span>' : '<span class="pill bad">tidak</span>'},
+      {key:"status", label:"Status"}
+    ]);
+    $("menusTable").innerHTML = table(state.menus, [
+      {key:"name", label:"Menu"},
+      {key:"url", label:"URL", render:r=>`<span class="mono">${esc(r.url)}</span>`},
+      {key:"page_id", label:"Page", render:r=>esc(Array.isArray(r.page_id) ? r.page_id.join(" / ") : r.page_id)},
+      {key:"sequence", label:"Seq"},
+      {key:"parent_id", label:"Parent", render:r=>esc(Array.isArray(r.parent_id) ? r.parent_id.join(" / ") : r.parent_id)}
+    ]);
+    $("viewsTable").innerHTML = table(state.views.slice(0,500), [
+      {key:"key", label:"Key", render:r=>`<span class="mono">${esc(r.key)}</span>`},
+      {key:"name", label:"Name"},
+      {key:"active", label:"Active", render:r=>r.active ? '<span class="pill ok">yes</span>' : '<span class="pill bad">no</span>'},
+      {key:"write_date", label:"Write Date"}
+    ]);
+  }
+  function makeScanPageArch() {
+    return `<t name="Lokalmart Scan" t-name="lokalmart.page_scan">
+  <t t-call="website.layout">
+    <div id="wrap" class="oe_structure">
+      <section class="lm-scan-page">
+        <style>
+          .lm-scan-page{min-height:100vh;background:radial-gradient(circle at top left,rgba(255,159,67,.32),transparent 30%),radial-gradient(circle at 85% 12%,rgba(130,89,255,.22),transparent 28%),linear-gradient(135deg,#070914,#101827 60%,#170f22);color:#fff;padding:28px 14px;font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif}
+          .lm-scan-wrap{max-width:1120px;margin:auto}
+          .lm-scan-hero{display:grid;grid-template-columns:1.05fr .95fr;gap:18px;align-items:stretch}
+          .lm-scan-card{border:1px solid rgba(255,255,255,.16);background:linear-gradient(180deg,rgba(255,255,255,.11),rgba(255,255,255,.055));backdrop-filter:blur(18px);border-radius:28px;box-shadow:0 24px 80px rgba(0,0,0,.36);padding:22px;overflow:hidden}
+          .lm-scan-badge{display:inline-flex;align-items:center;gap:8px;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.08);border-radius:999px;padding:8px 12px;color:#dfe6ff;font-weight:800;font-size:13px;margin-bottom:14px}
+          .lm-scan-dot{width:10px;height:10px;border-radius:99px;background:#30e39a;box-shadow:0 0 18px #30e39a}
+          .lm-scan-title{font-size:clamp(34px,6vw,66px);line-height:.92;margin:0 0 14px;letter-spacing:-.06em;font-weight:950}
+          .lm-scan-text{color:#c5cee6;line-height:1.55;font-size:16px;margin:0 0 18px}
+          .lm-scan-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:18px}
+          .lm-scan-mini{border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.06);border-radius:20px;padding:14px}
+          .lm-scan-mini b{display:block;font-size:20px}.lm-scan-mini span{display:block;color:#aeb8d4;font-size:12px;font-weight:700;margin-top:4px}
+          .lm-scan-box{position:relative;aspect-ratio:4/5;border-radius:26px;overflow:hidden;background:#000;border:1px solid rgba(255,255,255,.18)}
+          .lm-scan-box video{width:100%;height:100%;object-fit:cover;display:block;opacity:.92}
+          .lm-scan-frame{position:absolute;inset:13%;border:2px solid rgba(48,227,154,.85);border-radius:24px;box-shadow:0 0 0 999px rgba(0,0,0,.32),0 0 32px rgba(48,227,154,.28)}
+          .lm-scan-line{position:absolute;left:16%;right:16%;top:22%;height:2px;background:linear-gradient(90deg,transparent,#30e39a,transparent);box-shadow:0 0 18px #30e39a;animation:lmScan 2.2s ease-in-out infinite}
+          @keyframes lmScan{50%{top:76%}}
+          .lm-scan-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+          .lm-scan-btn{display:inline-flex;align-items:center;justify-content:center;border:0;border-radius:999px;padding:12px 16px;font-weight:900;text-decoration:none;cursor:pointer}
+          .lm-primary{background:linear-gradient(135deg,#30e39a,#d4ff77);color:#06130d}.lm-orange{background:linear-gradient(135deg,#ff9f43,#ffd166);color:#1b1005}.lm-ghost{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.18);color:#fff}
+          .lm-scan-input{width:100%;border:1px solid rgba(255,255,255,.16);background:rgba(0,0,0,.28);color:#fff;border-radius:18px;padding:14px 15px;outline:none}
+          .lm-scan-result{margin-top:14px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.07);border-radius:20px;padding:14px;color:#dfe7ff;min-height:76px}
+          .lm-scan-links{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:18px}
+          .lm-scan-link{border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.06);border-radius:20px;padding:14px;text-decoration:none;color:#fff}
+          .lm-scan-link small{display:block;color:#aeb8d4;margin-top:4px}
+          @media(max-width:900px){.lm-scan-hero{grid-template-columns:1fr}.lm-scan-links,.lm-scan-grid{grid-template-columns:1fr}.lm-scan-card{border-radius:22px}.lm-scan-page{padding:18px 10px}}
+        </style>
+        <div class="lm-scan-wrap">
+          <div class="lm-scan-hero">
+            <div class="lm-scan-card">
+              <div class="lm-scan-badge"><span class="lm-scan-dot"></span> Scan Barcode, QR Produk, dan Lokal ID</div>
+              <h1 class="lm-scan-title">Scan cepat untuk belanja lokal yang lebih terpercaya.</h1>
+              <p class="lm-scan-text">Gunakan kamera untuk membaca barcode/QR produk UMKM, cek katalog Lokalmart, hubungi admin, atau masuk ke alur surveyor produk.</p>
+              <input class="lm-scan-input" id="lmScanManual" placeholder="Atau ketik barcode / QR / Lokal ID manual"/>
+              <div class="lm-scan-actions">
+                <button class="lm-scan-btn lm-primary" id="lmStartScan" type="button">Aktifkan Kamera</button>
+                <button class="lm-scan-btn lm-orange" id="lmSearchCode" type="button">Cari di Katalog</button>
+                <a class="lm-scan-btn lm-ghost" id="lmWaCode" href="https://wa.me/628978109438" target="_blank">Kirim ke Admin</a>
+              </div>
+              <div class="lm-scan-result" id="lmScanResult">Status: siap scan. Jika kamera tidak terbuka, gunakan input manual.</div>
+              <div class="lm-scan-grid">
+                <div class="lm-scan-mini"><b>Produk</b><span>Cek barcode dan katalog.</span></div>
+                <div class="lm-scan-mini"><b>Lokal ID</b><span>Identitas anggota/koloni.</span></div>
+                <div class="lm-scan-mini"><b>Survey</b><span>Alur input produk lapangan.</span></div>
+              </div>
+            </div>
+            <div class="lm-scan-card">
+              <div class="lm-scan-box">
+                <video id="lmScanVideo" playsinline="playsinline" muted="muted"></video>
+                <div class="lm-scan-frame"></div>
+                <div class="lm-scan-line"></div>
+              </div>
+              <div class="lm-scan-links">
+                <a class="lm-scan-link" href="/shop">Buka Katalog<small>Lihat produk lokal</small></a>
+                <a class="lm-scan-link" href="/lokal-id">Lokal ID<small>Cek identitas anggota</small></a>
+                <a class="lm-scan-link" href="/lokal-ojek">LokalOjek<small>Hubungi kurir lokal</small></a>
+              </div>
+            </div>
+          </div>
+        </div>
+        <script><![CDATA[
+          (function(){
+            var video=document.getElementById("lmScanVideo");
+            var input=document.getElementById("lmScanManual");
+            var result=document.getElementById("lmScanResult");
+            var start=document.getElementById("lmStartScan");
+            var search=document.getElementById("lmSearchCode");
+            var wa=document.getElementById("lmWaCode");
+            var detector=null, stream=null, running=false, lastCode="";
+            function setCode(code){
+              lastCode=(code||"").trim();
+              input.value=lastCode;
+              result.textContent=lastCode ? ("Kode terbaca: "+lastCode) : "Status: siap scan.";
+              var q=encodeURIComponent(lastCode);
+              search.onclick=function(){ if(lastCode){ window.location.href="/shop?search="+q; } else { input.focus(); } };
+              wa.href="https://wa.me/628978109438?text="+encodeURIComponent("Halo Admin Lokalmart, saya ingin cek kode: "+lastCode);
+              try{
+                var hist=JSON.parse(localStorage.getItem("lm_scan_history")||"[]");
+                if(lastCode && hist.indexOf(lastCode)===-1){hist.unshift(lastCode);hist=hist.slice(0,20);localStorage.setItem("lm_scan_history",JSON.stringify(hist));}
+              }catch(e){}
+            }
+            input.addEventListener("input",function(){ setCode(input.value); });
+            search.onclick=function(){ var q=(input.value||"").trim(); if(q){ window.location.href="/shop?search="+encodeURIComponent(q); } else { input.focus(); } };
+            async function loop(){
+              if(!running || !detector || !video.videoWidth){ requestAnimationFrame(loop); return; }
+              try{
+                var codes=await detector.detect(video);
+                if(codes && codes[0] && codes[0].rawValue){
+                  if(codes[0].rawValue!==lastCode){ setCode(codes[0].rawValue); }
+                }
+              }catch(e){}
+              requestAnimationFrame(loop);
+            }
+            start.addEventListener("click",async function(){
+              try{
+                if(!("mediaDevices" in navigator)){ result.textContent="Browser belum mendukung kamera. Gunakan input manual."; return; }
+                stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:"environment"},audio:false});
+                video.srcObject=stream; await video.play(); running=true;
+                if("BarcodeDetector" in window){
+                  detector=new BarcodeDetector({formats:["qr_code","ean_13","ean_8","code_128","code_39","upc_a","upc_e","itf"]});
+                  result.textContent="Kamera aktif. Arahkan ke barcode atau QR.";
+                  loop();
+                } else {
+                  result.textContent="Kamera aktif, tetapi BarcodeDetector belum tersedia di browser ini. Gunakan input manual atau Chrome Android.";
+                }
+              }catch(e){
+                result.textContent="Kamera gagal aktif: "+(e.message||e);
+              }
+            });
+          })();
+        ]]><\/script>
+      </section>
+    </div>
+  </t>
+</t>`;
+  }
+  function filterValuesByFields(model, values) {
+    const fmap = state.fields[model] || {};
+    const out = {};
+    Object.keys(values).forEach(k => { if (fmap[k]) out[k] = values[k]; });
+    return out;
+  }
+  async function upsertScanPage() {
+    log("Upsert /scan dimulai...");
+    await fieldsGet("website.page");
+    await fieldsGet("ir.ui.view");
+    const arch = makeScanPageArch();
+    const pageVals = filterValuesByFields("website.page", {
+      name:"Lokalmart Scan",
+      url:"/scan",
+      type:"qweb",
+      key:"lokalmart.page_scan",
+      arch_db:arch,
+      is_published:true,
+      website_published:true,
+      website_indexed:true,
+      header_visible:true,
+      footer_visible:true,
+      website_meta_title:"Scan Barcode, QR, dan Lokal ID Lokalmart",
+      website_meta_description:"Halaman scanner Lokalmart untuk barcode produk, QR UMKM, Lokal ID, dan katalog lokal.",
+      website_meta_keywords:"Lokalmart, scan barcode, QR UMKM, Lokal ID, Cirebon"
+    });
+    const pages = await rpc("website.page", "search_read", [[["url","=","/scan"]]], {fields:["id","name","url","view_id"], limit:1});
+    if (pages.length) {
+      await rpc("website.page", "write", [[pages[0].id], pageVals]);
+      log("Page /scan sudah ada dan berhasil diperbarui.", pages[0]);
+    } else {
+      try {
+        const newId = await rpc("website.page", "create", [pageVals]);
+        log("Page /scan berhasil dibuat langsung di website.page.", {id:newId});
+      } catch (directErr) {
+        log("Create langsung website.page gagal. Fallback ke ir.ui.view + website.page/view_id.", directErr.message);
+        const viewVals = filterValuesByFields("ir.ui.view", {
+          name:"Lokalmart Scan",
+          type:"qweb",
+          key:"lokalmart.page_scan",
+          mode:"primary",
+          active:true,
+          priority:16,
+          arch_db:arch
+        });
+        let viewId;
+        const views = await rpc("ir.ui.view", "search_read", [[["key","=","lokalmart.page_scan"]]], {fields:["id","name","key"], limit:1});
+        if (views.length) {
+          viewId = views[0].id;
+          await rpc("ir.ui.view", "write", [[viewId], viewVals]);
+        } else {
+          viewId = await rpc("ir.ui.view", "create", [viewVals]);
+        }
+        const fallbackVals = filterValuesByFields("website.page", {
+          name:"Lokalmart Scan",
+          url:"/scan",
+          view_id:viewId,
+          is_published:true,
+          website_published:true,
+          website_indexed:true,
+          header_visible:true,
+          footer_visible:true,
+          website_meta_title:"Scan Barcode, QR, dan Lokal ID Lokalmart",
+          website_meta_description:"Halaman scanner Lokalmart untuk barcode produk, QR UMKM, Lokal ID, dan katalog lokal."
+        });
+        const pageId = await rpc("website.page", "create", [fallbackVals]);
+        log("Page /scan berhasil dibuat dengan fallback view_id.", {pageId, viewId});
+      }
+    }
+    await upsertScanMenu();
+    await scanAll();
+    alert("Selesai. Coba buka https://edu-lokalmart.odoo.com/scan");
+  }
+  async function upsertScanMenu() {
+    if (!(await modelExists("website.menu"))) return;
+    await fieldsGet("website.menu");
+    const existing = await rpc("website.menu", "search_read", [[["url","=","/scan"]]], {fields:["id","name","url"], limit:1});
+    const vals = filterValuesByFields("website.menu", {name:"Scan", url:"/scan", sequence:28});
+    if (existing.length) {
+      await rpc("website.menu", "write", [[existing[0].id], vals]);
+      log("Menu /scan diperbarui.");
+    } else {
+      try {
+        const id = await rpc("website.menu", "create", [vals]);
+        log("Menu /scan dibuat.", {id});
+      } catch (e) {
+        log("Menu /scan gagal dibuat. Bisa dibuat manual dari Website > Edit Menu.", e.message);
+      }
+    }
+  }
+  function exportXlsx() {
+    const wb = XLSX.utils.book_new();
+    const meta = [
+      ["Generated At", new Date().toISOString()],
+      ["Odoo URL", $("baseUrl").value],
+      ["Last Scan", state.lastScanAt ? state.lastScanAt.toISOString() : ""],
+      ["Pages", state.pages.length],
+      ["Menus", state.menus.length],
+      ["Views", state.views.length],
+      ["Missing", state.missing.length]
+    ];
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(meta), "00_README");
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(state.pages), "10_website.page_SCAN");
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(state.menus), "20_website.menu_SCAN");
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(state.views.map(v=>({...v, arch_db:v.arch_db ? String(v.arch_db).slice(0,32000) : ""}))), "30_ir.ui.view_SCAN");
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(state.missing), "40_MISSING_PAGES");
+    const importRows = [{
+      id:"lokalmart_page_scan",
+      name:"Lokalmart Scan",
+      type:"qweb",
+      key:"lokalmart.page_scan",
+      url:"/scan",
+      arch_db:makeScanPageArch(),
+      is_published:true,
+      website_published:true,
+      website_indexed:true,
+      header_visible:true,
+      footer_visible:true,
+      website_meta_title:"Scan Barcode, QR, dan Lokal ID Lokalmart",
+      website_meta_description:"Halaman scanner Lokalmart untuk barcode produk, QR UMKM, Lokal ID, dan katalog lokal.",
+      website_meta_keywords:"Lokalmart, scan barcode, QR UMKM, Lokal ID, Cirebon"
+    }];
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(importRows), "50_IMPORT_website.page");
+    XLSX.writeFile(wb, "lokalmart_odoo_pages_scan_export.xlsx");
+  }
+
+  document.querySelectorAll(".tab").forEach(btn=>{
+    btn.addEventListener("click",()=>{
+      document.querySelectorAll(".tab").forEach(b=>b.classList.remove("active"));
+      btn.classList.add("active");
+      ["pages","missing","menus","views","log"].forEach(t=>$("tab-"+t).classList.toggle("hidden", t!==btn.dataset.tab));
+    });
+  });
+  $("btnTest").addEventListener("click",()=>test().catch(e=>{log("Test gagal.",e.message);alert(e.message);}));
+  $("btnScan").addEventListener("click",()=>scanAll().catch(e=>{log("Scan gagal.",e.message);alert(e.message);}));
+  $("btnUpsertScan").addEventListener("click",()=>upsertScanPage().catch(e=>{log("Upsert gagal.",e.message);alert(e.message);}));
+  $("btnExport").addEventListener("click",exportXlsx);
+})();
+</script>
+</body>
+</html>
