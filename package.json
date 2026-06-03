@@ -1,12 +1,15 @@
 {
-  "name": "lokalmart-odoo-universal-xlsx-importer-v6",
-  "version": "6.0.0",
+  "name": "lokalmart-odoo-universal-importer-auditor-v7",
+  "version": "7.0.0",
   "type": "module",
   "private": true,
-  "description": "Universal XLSX/JSON importer and structure scanner for Lokalmart Odoo via Vercel",
+  "description": "Universal XLSX/JSON importer plus full Odoo database autopsy exporter for Lokalmart",
   "scripts": {
     "dev": "vercel dev",
     "deploy": "vercel --prod"
+  },
+  "dependencies": {
+    "xlsx": "^0.18.5"
   },
   "engines": {
     "node": ">=18"

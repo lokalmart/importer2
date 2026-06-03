@@ -4,6 +4,9 @@
     "api/odoo.js": {
       "maxDuration": 60
     },
+    "api/audit.js": {
+      "maxDuration": 60
+    },
     "api/import-xlsx.js": {
       "maxDuration": 60
     },
