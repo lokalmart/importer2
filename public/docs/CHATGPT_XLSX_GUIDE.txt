@@ -1,0 +1,691 @@
+LOKALMART IMPORTER STUDIO - PANDUAN CHATGPT MEMBUAT XLSX SIAP IMPORT
+Versi: v0.3.4 Studio Safe
+Target: Odoo Online / Odoo 18 / Vercel Lokalmart Importer Studio
+Tujuan: agar ChatGPT selalu membuat XLSX yang bisa langsung diimport, cepat, minim warning, dan aman untuk import ulang.
+
+====================================================================
+A. PRINSIP DASAR
+====================================================================
+
+1. XLSX harus dibuat untuk mesin import, bukan untuk dibaca manusia saja.
+2. Setiap sheet data harus memakai nama technical model Odoo, contoh:
+   - ir.model.fields
+   - res.partner
+   - product.category
+   - product.public.category
+   - product.tag
+   - product.attribute
+   - product.attribute.value
+   - product.template
+   - product.supplierinfo
+   - photo_import_queue
+3. Sheet catatan boleh ada, tetapi jangan dianggap sheet data. Gunakan awalan underscore:
+   - _README
+   - _source_notes
+   - _fix_notes
+   - _validation
+4. Workbook multi-sheet wajib punya sheet 00_import_order.
+5. Setiap sheet data wajib punya kolom:
+   - __action
+   - _external_id
+   - _model
+6. Semua record wajib punya _external_id stabil, unik, dan tidak berubah saat import ulang.
+7. Semua custom field Odoo Online wajib memakai prefix x_.
+8. Jangan mencampur data inti dengan QWeb/website.page kecuali benar-benar dibutuhkan.
+
+====================================================================
+B. URUTAN IMPORT WAJIB
+====================================================================
+
+Gunakan sheet 00_import_order dengan kolom minimal:
+- sequence
+- sheet
+- model
+- phase
+- note
+
+Urutan aman umum:
+1. ir.model
+2. ir.model.fields
+3. ir.model.access
+4. master data induk:
+   - res.partner.category
+   - res.partner
+   - product.category
+   - product.public.category
+   - product.tag
+   - product.attribute
+   - product.attribute.value
+5. product.template
+6. data relasi:
+   - product.template.attribute.line
+   - product.supplierinfo
+7. photo_import_queue
+8. custom data lain jika ada
+
+Catatan penting:
+- Setelah ir.model.fields berhasil, Importer Studio harus refresh metadata Odoo sebelum memproses sheet berikutnya.
+- Foto hanya boleh diproses setelah product.template berhasil created/updated.
+- product.supplierinfo hanya boleh diproses setelah product.template dan res.partner target ada.
+
+====================================================================
+C. FORMAT KOLOM DASAR SETIAP SHEET DATA
+====================================================================
+
+Kolom wajib:
+- __action
+- _external_id
+- _model
+
+Nilai __action yang aman:
+- upsert      : update jika external ID ada, create jika belum ada.
+- create      : create saja. Gunakan terbatas.
+- update      : update saja. Gunakan untuk patch.
+- delete      : hindari kecuali patch khusus.
+
+Contoh:
+__action: upsert
+_external_id: lokalmart.product_001_nasi_jamblang_paket_ayam
+_model: product.template
+
+Namespace external ID:
+- Gunakan namespace konsisten: lokalmart.xxx
+- Jangan memakai spasi.
+- Jangan memakai karakter aneh.
+- Gunakan lowercase dan underscore.
+
+Contoh aman:
+- lokalmart.partner_koperasi_lokal_kejaksan
+- lokalmart.cat_lm_barang_dagang_sembako
+- lokalmart.public_cat_kuliner_lokal_nasi_jamblang
+- lokalmart.tag_h_plus_1
+- lokalmart.product_001_nasi_jamblang_paket_ayam
+
+====================================================================
+D. ATURAN RELASI MANY2ONE DAN MANY2MANY
+====================================================================
+
+1. Many2one harus pakai suffix _external_id.
+   Contoh:
+   - categ_id_external_id
+   - parent_id_external_id
+   - partner_id_external_id
+   - product_tmpl_id_external_id
+   - x_lm_vendor_id_external_id
+
+2. Many2many harus pakai suffix _external_ids.
+   Isi beberapa external ID dipisahkan koma.
+   Contoh:
+   - public_categ_ids_external_ids
+   - product_tag_ids_external_ids
+   - category_id_external_ids
+
+3. Jangan pakai ID database numerik Odoo.
+   Salah:
+   categ_id: 15
+   Benar:
+   categ_id_external_id: lokalmart.cat_lm_kuliner_siap_jual
+
+4. Relasi external ID harus sudah ada dari sheet sebelumnya.
+   Jika belum ada, importer akan memberi error:
+   External ID relasi tidak ditemukan.
+
+====================================================================
+E. MODE SUPER CEPAT DAN ERROR BOOLEAN value.lower
+====================================================================
+
+Mode Super Cepat memakai method native-like Odoo load(fields, data).
+Pada mode ini, Odoo membaca nilai seperti import wizard native.
+Karena itu nilai boolean harus dikirim sebagai TEKS, bukan boolean JavaScript.
+
+ERROR YANG WAJIB DICEGAH:
+AttributeError: 'bool' object has no attribute 'lower'
+atau:
+value.lower is not a function
+
+Penyebab:
+- XLSX dibaca menjadi boolean JavaScript true/false.
+- Lalu dikirim ke Odoo load().
+- Converter boolean Odoo mengharapkan string dan memanggil value.lower().
+- Karena value berupa bool, import gagal.
+
+Aturan pembuatan XLSX:
+- Untuk mode Super Cepat, semua boolean di sel XLSX harus berupa teks:
+  TRUE atau FALSE
+- Jangan isi sebagai boolean Excel asli TRUE/FALSE jika library akan membacanya sebagai bool.
+- Lebih aman tulis sebagai string teks: "TRUE" dan "FALSE".
+- Untuk sheet ir.model.fields, nilai required/readonly/store/index/copied juga pakai teks:
+  TRUE / FALSE
+
+Contoh aman:
+website_published: FALSE
+sale_ok: TRUE
+purchase_ok: TRUE
+required: FALSE
+store: TRUE
+copied: TRUE
+
+Contoh rawan:
+website_published: true
+required: false
+
+Pencegahan di Importer Studio v0.3.4:
+- Saat mode Super Cepat, importer otomatis mengubah boolean JS menjadi teks TRUE/FALSE sebelum memanggil Odoo load().
+- Walaupun begitu, ChatGPT tetap wajib membuat XLSX dengan nilai boolean teks untuk menghindari error lintas tool.
+
+====================================================================
+F. ATURAN TIPE NILAI DI XLSX
+====================================================================
+
+1. Boolean:
+   Gunakan teks TRUE/FALSE.
+
+2. Angka:
+   Gunakan angka normal untuk harga dan cost:
+   list_price: 15000
+   standard_price: 9000
+   Namun mode Super Cepat akan mengirimnya ke Odoo sebagai string agar Odoo load parsing sendiri.
+
+3. Tanggal:
+   Gunakan format ISO:
+   YYYY-MM-DD
+   Contoh: 2026-06-05
+
+4. Datetime:
+   Gunakan format:
+   YYYY-MM-DD HH:MM:SS
+   Hindari timezone lokal di sel XLSX kecuali field memang butuh.
+
+5. Selection:
+   Isi dengan technical value, bukan label tampilan jika diketahui.
+   Contoh product.type Odoo 18 bisa berbeda tergantung database.
+   Jika ragu, hindari field selection rawan dan pakai field default Odoo saja.
+
+6. HTML:
+   Untuk deskripsi HTML pendek boleh pakai description_sale atau website_description.
+   Jangan memasukkan JavaScript/QWeb di sheet produk.
+
+====================================================================
+G. ATURAN ir.model.fields
+====================================================================
+
+Sheet: ir.model.fields
+Kolom wajib:
+- __action
+- _external_id
+- _model
+- model
+- name
+- field_description
+- ttype
+- relation
+- required
+- readonly
+- store
+- index
+- copied
+- state
+- help
+
+Aturan:
+1. Semua custom field wajib prefix x_.
+2. Jangan membuat custom char field berakhiran _id jika bukan Many2one.
+   Salah: x_lm_lokal_id jika hanya kode teks.
+   Benar: x_lm_lokal_code.
+3. Custom Many2one:
+   - ttype = many2one
+   - relation = technical model tujuan
+   - required = FALSE untuk tahap pembuatan field
+   - on_delete = restrict jika kolom tersedia
+   - ondelete = restrict jika kolom tersedia
+4. Jangan mengubah tipe field yang sudah ada.
+   Jika x_lm_delivery_status sudah ada sebagai selection, jangan buat lagi sebagai char.
+   Buat field baru, contoh x_lm_delivery_label.
+
+Error yang dicegah:
+Changing the type of a field is not yet supported. Please drop it and create it again!
+
+Solusi:
+- Importer Studio akan skip field existing dengan tipe berbeda.
+- ChatGPT wajib memilih nama field baru jika diketahui field lama konflik.
+
+====================================================================
+H. ATURAN ir.model.access / ACL
+====================================================================
+
+Jika membuat custom model x_*, wajib buat ACL sebelum mengisi record model itu.
+Sheet: ir.model.access
+Kolom disarankan:
+- __action
+- _external_id
+- _model
+- name
+- model_id_external_id
+- group_id_external_id
+- perm_read
+- perm_write
+- perm_create
+- perm_unlink
+
+Nilai permission pakai teks TRUE/FALSE.
+
+Contoh:
+_model: ir.model.access
+name: access_x_lm_koloni_user
+model_id_external_id: lokalmart.model_x_lm_koloni
+group_id_external_id: base.group_user
+perm_read: TRUE
+perm_write: TRUE
+perm_create: TRUE
+perm_unlink: FALSE
+
+Error yang dicegah:
+You are not allowed to create ... No group currently allows this operation.
+
+====================================================================
+I. ATURAN product.category
+====================================================================
+
+Sheet: product.category
+Kolom aman:
+- __action
+- _external_id
+- _model
+- name
+- parent_id_external_id
+
+Jangan pakai kolom active jika database Odoo menunjukkan product.category tidak punya field active.
+Jangan pakai sequence jika target Odoo tidak punya field sequence.
+Jangan pakai complete_name karena computed/display field.
+
+Kategori internal dipakai untuk akuntansi, stok, dan laporan.
+Jangan buat kategori internal berdasarkan kelurahan terlalu detail.
+Wilayah lebih baik pakai tag/attribute/custom field.
+
+====================================================================
+J. ATURAN product.public.category
+====================================================================
+
+Sheet: product.public.category
+Kolom aman:
+- __action
+- _external_id
+- _model
+- name
+- parent_id_external_id
+
+Kategori eCommerce untuk tampilan website.
+Boleh lebih marketing-oriented:
+- Belanja Harian
+- Kuliner Lokal
+- Produk UMKM
+- Oleh-oleh Cirebon
+- Tanaman Hias
+- Program Lokalmart
+- Beli Lokal / Cirebon / Kejaksan
+
+====================================================================
+K. ATURAN product.tag
+====================================================================
+
+Sheet: product.tag
+Kolom aman:
+- __action
+- _external_id
+- _model
+- name
+
+Jika model product.tag tidak tersedia di database target, jadikan optional.
+Jangan biarkan kegagalan tag menghentikan import produk.
+
+====================================================================
+L. ATURAN product.attribute DAN product.attribute.value
+====================================================================
+
+Sheet product.attribute:
+Kolom aman:
+- __action
+- _external_id
+- _model
+- name
+- display_type
+- create_variant
+
+Sheet product.attribute.value:
+Kolom aman:
+- __action
+- _external_id
+- _model
+- name
+- attribute_id_external_id
+
+Nilai create_variant harus technical value jika diketahui.
+Jika ragu, gunakan no_variant untuk atribut filter non-varian seperti status pengiriman atau wilayah.
+
+====================================================================
+M. ATURAN res.partner DAN VENDOR
+====================================================================
+
+Sheet: res.partner
+Kolom aman:
+- __action
+- _external_id
+- _model
+- name
+- company_type
+- supplier_rank
+- customer_rank
+- phone
+- mobile
+- email
+- street
+- city
+- category_id_external_ids
+- x_lm_lokal_code jika field ada
+
+Vendor/UMKM/koperasi harus dibuat sebelum product.supplierinfo.
+
+Untuk vendor koperasi:
+name: Koperasi Lokal Kejaksan
+supplier_rank: 1
+company_type: company
+
+====================================================================
+N. ATURAN product.template
+====================================================================
+
+Sheet: product.template
+Kolom minimal aman:
+- __action
+- _external_id
+- _model
+- name
+- default_code
+- sale_ok
+- purchase_ok
+- list_price
+- standard_price
+- categ_id_external_id
+- public_categ_ids_external_ids
+- product_tag_ids_external_ids jika product.tag tersedia
+- description_sale
+- website_description jika aman
+- website_published
+
+Aturan:
+1. Jangan masukkan image_url ke product.template jika foto akan diproses lewat photo_import_queue.
+2. Jangan isi field yang belum ada.
+3. Jika butuh field tambahan Lokalmart, buat dulu di ir.model.fields.
+4. Jangan isi barcode palsu/duplikat. Jika tidak ada barcode asli, kosongkan.
+5. Jangan publish otomatis jika foto/harga belum valid.
+   website_published: FALSE
+
+Produk harus berhasil created/updated sebelum:
+- product.supplierinfo
+- photo_import_queue
+
+====================================================================
+O. ATURAN product.supplierinfo
+====================================================================
+
+Sheet: product.supplierinfo
+Kolom aman:
+- __action
+- _external_id
+- _model
+- partner_id_external_id
+- product_tmpl_id_external_id
+- price
+- min_qty
+- delay
+
+Aturan:
+- partner_id_external_id harus mengarah ke vendor yang sudah ada.
+- product_tmpl_id_external_id harus mengarah ke product.template yang sudah berhasil dibuat.
+- Jika product.template gagal, supplierinfo pasti gagal.
+
+====================================================================
+P. ATURAN FOTO OTOMATIS
+====================================================================
+
+Gunakan sheet: photo_import_queue
+Ini bukan model Odoo asli. Ini handler khusus Importer Studio.
+
+Kolom wajib:
+- __action
+- _external_id
+- _model
+- model
+- record_external_id
+- image_url
+- image_field
+- image_alt
+- image_note
+- priority
+
+Contoh:
+__action: upsert
+_external_id: lokalmart.photo_queue_001_nasi_jamblang
+_model: photo_import_queue
+model: product.template
+record_external_id: lokalmart.product_001_nasi_jamblang_paket_ayam
+image_url: https://example.com/nasi-jamblang.jpg
+image_field: image_1920
+image_alt: Nasi Jamblang Paket Ayam
+image_note: Foto utama produk
+priority: 10
+
+Aturan penting:
+- _external_id adalah ID antrean foto.
+- record_external_id adalah ID produk tujuan.
+- Jangan memakai product_tmpl_id_external_id untuk photo_import_queue.
+- image_url harus URL publik tanpa login.
+- Jangan pakai Google Drive private, WhatsApp, marketplace private, atau URL yang butuh cookie.
+- Foto diproses setelah product.template created/updated > 0.
+
+Error yang dicegah:
+External ID record tidak ditemukan: lokalmart.photo_queue_xxx
+
+Penyebab:
+- record_external_id keliru diisi ID queue, bukan ID produk.
+
+Benar:
+record_external_id: lokalmart.product_001_nasi_jamblang
+
+Salah:
+record_external_id: lokalmart.photo_queue_001_nasi_jamblang
+
+====================================================================
+Q. ATURAN QWEB / WEBSITE PAGE
+====================================================================
+
+Jangan campur QWeb dengan import produk inti.
+Jika harus membuat halaman website:
+1. ir.ui.view
+2. website.page
+3. website.menu
+
+Aturan XML/QWeb:
+- HTML harus valid XML.
+- Boolean attribute harus lengkap:
+  disabled="disabled"
+  checked="checked"
+  selected="selected"
+  open="open"
+  readonly="readonly"
+  required="required"
+- JavaScript di <script> harus dibungkus CDATA.
+- Escape karakter:
+  & menjadi &amp;
+  < jangan mentah di teks
+
+====================================================================
+R. ATURAN PERFORMA SUPER CEPAT
+====================================================================
+
+Agar impor cepat seperti native Odoo:
+1. Gunakan mode Super Cepat untuk data besar.
+2. Kurangi warning. Warning berulang memperlambat proses.
+3. Jangan kirim kolom yang tidak ada di model target.
+4. Pecah import menjadi fase:
+   - struktur/field
+   - master data
+   - produk
+   - relasi
+   - foto
+5. Gunakan batch besar untuk data bersih:
+   - master data: 80-200 row
+   - product.template: 50-150 row
+   - foto: 5-15 row karena download gambar berat
+6. Untuk ir.model.fields tetap gunakan handler khusus, bukan load native biasa.
+7. Untuk row yang rawan relasi/foto, gunakan mode Aman jika perlu debugging.
+
+====================================================================
+S. PREFLIGHT WAJIB SEBELUM FILE DIBERIKAN
+====================================================================
+
+ChatGPT wajib mengecek ini sebelum memberi XLSX:
+1. Tidak ada row kosong.
+2. Semua sheet data punya __action, _external_id, _model.
+3. 00_import_order ada jika lebih dari satu sheet data.
+4. Semua custom field memakai prefix x_.
+5. Semua Many2one memakai *_external_id.
+6. Semua Many2many memakai *_external_ids.
+7. Tidak ada kolom unsupported yang diketahui, seperti active di product.category jika target tidak punya.
+8. Tidak ada computed field seperti complete_name.
+9. Boolean ditulis sebagai teks TRUE/FALSE.
+10. product.template memiliki name dan categ_id_external_id.
+11. product.supplierinfo target vendor dan produk sudah ada di sheet sebelumnya.
+12. photo_import_queue memakai record_external_id ke product.template, bukan ke queue.
+13. image_url publik dan format URL valid.
+14. website_published default FALSE untuk produk yang belum diverifikasi.
+15. Jangan pakai barcode palsu atau duplikat.
+16. Jangan mencampur QWeb/website.page dalam file produk.
+
+====================================================================
+T. DAFTAR ERROR DAN CARA MENCEGAH
+====================================================================
+
+1. Error:
+AttributeError: 'bool' object has no attribute 'lower'
+Penyebab:
+Boolean JS dikirim ke Odoo load().
+Pencegahan:
+Gunakan TRUE/FALSE sebagai teks. Importer Studio juga convert otomatis di mode Super Cepat.
+
+2. Error:
+Changing the type of a field is not yet supported.
+Penyebab:
+Mencoba membuat field dengan nama yang sama tetapi ttype berbeda.
+Pencegahan:
+Jangan ubah tipe field lama. Buat nama field baru, contoh x_lm_delivery_label.
+
+3. Error:
+ir.model.fields row wajib punya model dan name.
+Penyebab:
+Sheet ir.model.fields tidak punya kolom model/name.
+Pencegahan:
+Selalu isi model dan name di setiap row ir.model.fields.
+
+4. Error:
+External ID relasi tidak ditemukan.
+Penyebab:
+Relasi mengarah ke record yang belum dibuat atau external ID salah.
+Pencegahan:
+Perbaiki 00_import_order dan external ID relasi.
+
+5. Error:
+External ID record tidak ditemukan pada photo_import_queue.
+Penyebab:
+record_external_id mengarah ke queue ID, bukan produk.
+Pencegahan:
+record_external_id harus external ID product.template.
+
+6. Warning:
+Kolom active dilewati karena field tidak ada di product.category.
+Pencegahan:
+Hapus active dari product.category jika target Odoo tidak punya field itu.
+
+7. Error:
+You are not allowed to create custom model records.
+Penyebab:
+Custom model x_* belum punya ACL.
+Pencegahan:
+Buat ir.model.access sebelum sheet data custom model.
+
+8. Error:
+Barcode(s) already assigned.
+Penyebab:
+Barcode duplikat.
+Pencegahan:
+Kosongkan barcode jika tidak yakin unik.
+
+9. Error:
+Wrong value for selection field.
+Penyebab:
+Mengisi label tampilan, bukan technical value.
+Pencegahan:
+Gunakan technical value atau hindari field selection rawan.
+
+10. Timeout / FUNCTION_INVOCATION_TIMEOUT.
+Penyebab:
+Batch terlalu besar, terlalu banyak warning, foto terlalu berat, atau server lambat.
+Pencegahan:
+Kecilkan batch, bersihkan kolom invalid, pisahkan foto, gunakan retry.
+
+====================================================================
+U. TEMPLATE MINIMAL 00_import_order
+====================================================================
+
+sequence | sheet | model | phase | note
+1 | ir.model.fields | ir.model.fields | schema | Custom fields
+2 | res.partner.category | res.partner.category | master | Partner tags
+3 | res.partner | res.partner | master | Vendors
+4 | product.category | product.category | master | Internal categories
+5 | product.public.category | product.public.category | master | Website categories
+6 | product.tag | product.tag | master | Product tags
+7 | product.attribute | product.attribute | master | Attributes
+8 | product.attribute.value | product.attribute.value | master | Attribute values
+9 | product.template | product.template | products | Products
+10 | product.supplierinfo | product.supplierinfo | relations | Supplier prices
+11 | photo_import_queue | photo_import_queue | photos | Product images
+
+====================================================================
+V. TEMPLATE MINIMAL product.template
+====================================================================
+
+__action | _external_id | _model | name | default_code | sale_ok | purchase_ok | list_price | standard_price | categ_id_external_id | public_categ_ids_external_ids | product_tag_ids_external_ids | description_sale | website_published
+upsert | lokalmart.product_001_nasi_jamblang | product.template | Nasi Jamblang Paket Ayam - Vendor - 1 Porsi - Cirebon | LM-001 | TRUE | TRUE | 18000 | 12000 | lokalmart.cat_lm_kuliner_siap_jual | lokalmart.public_cat_kuliner_nasi_jamblang | lokalmart.tag_h_plus_1,lokalmart.tag_kuliner_lokal | Nasi jamblang paket ayam untuk area Cirebon. | FALSE
+
+====================================================================
+W. TEMPLATE MINIMAL photo_import_queue
+====================================================================
+
+__action | _external_id | _model | model | record_external_id | image_url | image_field | image_alt | image_note | priority
+upsert | lokalmart.photo_queue_001_nasi_jamblang | photo_import_queue | product.template | lokalmart.product_001_nasi_jamblang | https://example.com/nasi-jamblang.jpg | image_1920 | Nasi Jamblang Paket Ayam | Foto utama produk | 10
+
+====================================================================
+X. INSTRUKSI UNTUK CHATGPT SETIAP MEMBUAT XLSX LOKALMART
+====================================================================
+
+Saat user meminta file XLSX untuk Lokalmart Importer Studio, ChatGPT wajib:
+1. Buat workbook dengan 00_import_order.
+2. Buat sheet data memakai nama technical model.
+3. Gunakan _external_id stabil.
+4. Import schema/field dulu jika butuh custom field.
+5. Hindari kolom yang tidak ada di target model.
+6. Tulis boolean sebagai teks TRUE/FALSE.
+7. Buat foto lewat photo_import_queue.
+8. Pastikan record_external_id foto mengarah ke produk.
+9. Set website_published FALSE kecuali user minta publish.
+10. Tambahkan sheet _validation berisi ringkasan jumlah row, jumlah external ID, dan catatan risiko.
+11. Jangan memberi file jika masih ada relasi ke external ID yang belum dibuat di file atau belum diasumsikan ada di database.
+
+SELESAI.
+
+
+UPDATE v1.0.2 - Product Image / eCommerce Media
+- Sheet product.image didukung pada fase relations.
+- Untuk eCommerce Media, buat record product.image lebih dulu lalu photo_import_queue menulis ke product.image.image_1920.
+- photo_import_queue harus memakai model dan record_external_id.
+- Parser tidak lagi mengubah teks TRUE/FALSE menjadi boolean terlalu awal, untuk mencegah error Odoo load(): bool has no lower.

@@ -1,41 +1,69 @@
-export default async function handler(req, res) {
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
-  res.setHeader("Cache-Control", "no-store");
-  if (req.method === "OPTIONS") return res.status(204).end();
-  if (req.method !== "POST") return res.status(405).json({ ok:false, error:"Use POST" });
+const { sendJson, readJsonBody } = require('../lib/http');
+const { OdooClient } = require('../lib/odooClient');
+const { previewWorkbook, getRowsForSheet } = require('../lib/xlsxParser');
+const { preflightWorkbook } = require('../lib/preflight');
+const { importSheetBatch } = require('../lib/importEngine');
+const { importPhotoBatch } = require('../lib/photoImporter');
+const { simplifyError } = require('../lib/errors');
+
+module.exports = async function handler(req, res) {
+  if (req.method === 'OPTIONS') {
+    res.statusCode = 204;
+    res.end();
+    return;
+  }
+  if (req.method !== 'POST') {
+    return sendJson(res, 405, { ok: false, error: 'Gunakan POST.' });
+  }
 
   try {
-    const body = typeof req.body === "string" ? JSON.parse(req.body || "{}") : (req.body || {});
-    const { baseUrl, db, login, password, model, method, args = [], kwargs = {} } = body;
-    if (!baseUrl || !db || !login || !password) return res.status(400).json({ ok:false, error:"Missing Odoo credentials" });
+    const body = await readJsonBody(req);
+    const action = body.action;
+    const target = body.target || {};
+    const payload = body.payload || {};
 
-    const rpcUrl = `${String(baseUrl).replace(/\/+$/,"")}/jsonrpc`;
-
-    async function jsonRpc(service, rpcMethod, rpcArgs) {
-      const response = await fetch(rpcUrl, {
-        method:"POST",
-        headers:{ "Content-Type":"application/json" },
-        body:JSON.stringify({ jsonrpc:"2.0", method:"call", params:{ service, method:rpcMethod, args:rpcArgs }, id:Date.now() })
-      });
-      const text = await response.text();
-      let payload;
-      try { payload = JSON.parse(text); } catch(e) { throw new Error(`Odoo returned non-JSON: ${text.slice(0,800)}`); }
-      if (!response.ok || payload.error) {
-        throw new Error(payload.error?.data?.message || payload.error?.data?.debug || payload.error?.message || text);
-      }
-      return payload.result;
+    if (action === 'preview_xlsx') {
+      return sendJson(res, 200, { ok: true, ...previewWorkbook(payload.fileBase64) });
     }
 
-    const uid = await jsonRpc("common", "authenticate", [db, login, password, {}]);
-    if (!uid) return res.status(401).json({ ok:false, error:"Authentication failed" });
+    if (action === 'preflight_xlsx') {
+      return sendJson(res, 200, { ok: true, preflight: preflightWorkbook(payload.fileBase64) });
+    }
 
-    if (!model || !method) return res.status(200).json({ ok:true, uid });
+    if (action === 'test_connection') {
+      const odoo = new OdooClient(target);
+      const uid = await odoo.authenticate();
+      let version = null;
+      try { version = await odoo.version(); } catch (_) {}
+      return sendJson(res, 200, { ok: true, uid, version });
+    }
 
-    const result = await jsonRpc("object", "execute_kw", [db, uid, password, model, method, args, kwargs || {}]);
-    res.status(200).json({ ok:true, uid, result });
-  } catch(e) {
-    res.status(500).json({ ok:false, error:e.message || String(e) });
+    if (action === 'import_sheet_batch' || action === 'import_native_sheet_batch') {
+      const odoo = new OdooClient(target);
+      await odoo.authenticate();
+      const { sheet, model, rows, total, offset, limit } = getRowsForSheet(payload.fileBase64, payload.sheet, payload.offset || 0, payload.limit || 50);
+      const report = await importSheetBatch({
+        odoo,
+        sheet,
+        model: payload.model || model,
+        rows,
+        mode: action === 'import_native_sheet_batch' ? 'super_fast' : (payload.mode || 'normal'),
+        options: payload.options || {}
+      });
+      return sendJson(res, 200, { ok: true, sheet, model: payload.model || model, total, offset, limit, next_offset: offset + rows.length, done: offset + rows.length >= total, report });
+    }
+
+    if (action === 'import_product_images_batch') {
+      const odoo = new OdooClient(target);
+      await odoo.authenticate();
+      const { sheet, rows, total, offset, limit } = getRowsForSheet(payload.fileBase64, payload.sheet || 'photo_import_queue', payload.offset || 0, payload.limit || 10);
+      const report = await importPhotoBatch({ odoo, sheet, rows, options: payload.options || {} });
+      return sendJson(res, 200, { ok: true, sheet, total, offset, limit, next_offset: offset + rows.length, done: offset + rows.length >= total, report });
+    }
+
+    return sendJson(res, 400, { ok: false, error: `Action tidak dikenal: ${action}` });
+  } catch (err) {
+    const simple = simplifyError(err);
+    return sendJson(res, 500, { ok: false, error: simple.message, detail: simple.detail });
   }
-}
+};

@@ -1,330 +1,235 @@
 <!doctype html>
 <html lang="id">
 <head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>Lokalmart Universal Importer + Odoo Autopsy V7</title>
-  <script>
-    window.__xlsxReady = new Promise(function(resolve, reject){
-      function load(src, fail){
-        var s = document.createElement("script");
-        s.src = src;
-        s.async = true;
-        s.onload = function(){ window.XLSX ? resolve(window.XLSX) : (fail ? fail() : reject(new Error("Library XLSX gagal dimuat."))); };
-        s.onerror = function(){ fail ? fail() : reject(new Error("Library XLSX gagal dimuat dari semua CDN.")); };
-        document.head.appendChild(s);
-      }
-      load("https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js", function(){
-        load("https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js", function(){
-          load("https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js");
-        });
-      });
-    });
-    async function getXLSX(){
-      if(window.XLSX) return window.XLSX;
-      if(window.__xlsxReady) return await window.__xlsxReady;
-      throw new Error("XLSX belum tersedia. Refresh halaman lalu coba lagi.");
-    }
-  </script>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lokalmart Importer Studio</title>
   <style>
-    :root{--bg:#070914;--line:rgba(255,255,255,.14);--text:#f8fbff;--muted:#b9c3dc;--green:#30e39a;--orange:#ff9f43;--blue:#66d9ff;--purple:#b987ff;--red:#ff5f6d;--shadow:0 22px 78px rgba(0,0,0,.44)}
-    *{box-sizing:border-box}body{margin:0;min-height:100vh;color:var(--text);font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;background:radial-gradient(circle at 12% 8%,rgba(255,159,67,.28),transparent 32%),radial-gradient(circle at 88% 16%,rgba(185,135,255,.24),transparent 30%),radial-gradient(circle at 50% 95%,rgba(48,227,154,.16),transparent 32%),linear-gradient(135deg,#070914,#111827 58%,#180f26)}
-    .wrap{max-width:1280px;margin:0 auto;padding:22px}.hero{display:grid;grid-template-columns:1.05fr .95fr;gap:16px;margin-bottom:16px}.card{position:relative;overflow:hidden;border:1px solid var(--line);border-radius:28px;background:linear-gradient(180deg,rgba(255,255,255,.105),rgba(255,255,255,.055));box-shadow:var(--shadow);backdrop-filter:blur(18px);padding:20px}.badge{display:inline-flex;gap:9px;align-items:center;border:1px solid var(--line);background:rgba(255,255,255,.08);border-radius:999px;padding:8px 12px;font-weight:900;color:#e8efff;font-size:13px;margin-bottom:14px}.dot{width:10px;height:10px;background:var(--green);border-radius:99px;box-shadow:0 0 18px var(--green)}
-    h1{margin:0 0 14px;font-size:clamp(32px,5vw,58px);line-height:.95;letter-spacing:-.055em}h2{margin:0 0 10px;font-size:21px}p{margin:0 0 14px;color:var(--muted);line-height:1.55}label{display:block;font-size:12px;color:#dce5fb;font-weight:900;letter-spacing:.06em;text-transform:uppercase}input,textarea,select{width:100%;margin-top:6px;border:1px solid var(--line);border-radius:14px;background:rgba(0,0,0,.26);color:var(--text);padding:12px 13px;outline:none;font:inherit}textarea{min-height:96px;resize:vertical}input:focus,textarea:focus,select:focus{border-color:rgba(48,227,154,.62);box-shadow:0 0 0 4px rgba(48,227,154,.12)}
-    .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}.btns{display:flex;flex-wrap:wrap;gap:10px;margin-top:14px}button{border:0;border-radius:999px;padding:12px 16px;cursor:pointer;font-weight:950;color:#07111c;background:#fff;box-shadow:0 12px 34px rgba(0,0,0,.26);transition:.18s transform,.18s opacity}button:hover{transform:translateY(-1px)}button:disabled{opacity:.42;cursor:not-allowed;transform:none}.primary{background:linear-gradient(135deg,var(--green),#d4ff77)}.orange{background:linear-gradient(135deg,var(--orange),#ffd166)}.blue{background:linear-gradient(135deg,var(--blue),#d4f8ff)}.purple{background:linear-gradient(135deg,var(--purple),#ff8edb);color:#17091f}.danger{background:linear-gradient(135deg,var(--red),#ffb199);color:#250508}.ghost{background:rgba(255,255,255,.08);color:#fff;border:1px solid var(--line);box-shadow:none}
-    .kpi{border:1px solid var(--line);background:rgba(255,255,255,.06);border-radius:22px;padding:15px}.kpi b{display:block;font-size:29px;letter-spacing:-.04em}.kpi span{display:block;color:var(--muted);font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.07em}.tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}.tab{background:rgba(255,255,255,.08);color:#eaf0ff;border:1px solid var(--line);box-shadow:none}.tab.active{background:#fff;color:#07111c}
-    table{width:100%;border-collapse:separate;border-spacing:0 8px;font-size:13px}th{text-align:left;color:#dce5fb;font-size:11px;text-transform:uppercase;letter-spacing:.06em;padding:0 10px}td{background:rgba(255,255,255,.064);border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:10px;vertical-align:top;color:#f5f8ff}td:first-child{border-left:1px solid var(--line);border-radius:14px 0 0 14px}td:last-child{border-right:1px solid var(--line);border-radius:0 14px 14px 0}.pill{display:inline-flex;align-items:center;border-radius:999px;padding:4px 8px;border:1px solid var(--line);background:rgba(255,255,255,.08);font-size:11px;font-weight:950}.ok{color:#8dffcf}.warn{color:#ffd166}.bad{color:#ff9da7}.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}pre{margin:0;white-space:pre-wrap;word-break:break-word;background:rgba(0,0,0,.28);border:1px solid var(--line);border-radius:18px;padding:14px;color:#dfe7ff;max-height:440px;overflow:auto}.small{font-size:12px;color:var(--muted)}.hidden{display:none!important}.drop{border:1px dashed rgba(255,255,255,.28);border-radius:22px;background:rgba(255,255,255,.055);padding:16px;text-align:center;color:#dfe7ff}.drop strong{display:block;font-size:16px;margin-bottom:4px}.drop.drag{border-color:var(--green);box-shadow:0 0 0 4px rgba(48,227,154,.12)}
-    @media(max-width:960px){.hero,.grid2{grid-template-columns:1fr}.grid4{grid-template-columns:1fr 1fr}.wrap{padding:14px}.card{border-radius:22px;padding:16px}}@media(max-width:620px){.grid4{grid-template-columns:1fr}.btns button{width:100%}}
+    :root{--bg:#0b1020;--panel:#121a2e;--panel2:#18223a;--line:#26324f;--text:#eef3ff;--muted:#9fb0d0;--ok:#44d07b;--warn:#ffd166;--err:#ff5f6d;--accent:#6ee7f9;--accent2:#a78bfa;--chip:#22304f}*{box-sizing:border-box}body{margin:0;font-family:Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:radial-gradient(circle at top left,#1f2d5c 0,#0b1020 32%,#070a14 100%);color:var(--text)}button,input,select,textarea{font:inherit}button{border:0;border-radius:14px;padding:12px 16px;font-weight:700;cursor:pointer;color:#06111d;background:linear-gradient(135deg,var(--accent),var(--accent2));box-shadow:0 10px 30px #0007}button.secondary{background:#202b48;color:var(--text);border:1px solid var(--line);box-shadow:none}button.danger{background:#40242a;color:#fff;border:1px solid #743642}button:disabled{opacity:.45;cursor:not-allowed}.app{display:grid;grid-template-columns:300px 1fr;min-height:100vh}.side{border-right:1px solid var(--line);background:#080d1bdd;padding:24px;position:sticky;top:0;height:100vh;overflow:auto}.brand{display:flex;align-items:center;gap:12px;margin-bottom:22px}.logo{width:42px;height:42px;border-radius:14px;background:linear-gradient(135deg,#ff9f1c,#6ee7f9);box-shadow:0 12px 32px #0008}.brand h1{font-size:20px;line-height:1.1;margin:0}.brand p{margin:3px 0 0;color:var(--muted);font-size:12px}.steps{display:flex;flex-direction:column;gap:10px}.step{padding:12px 14px;border-radius:16px;border:1px solid var(--line);background:#10182b;color:var(--muted);display:flex;justify-content:space-between;align-items:center}.step.active{background:linear-gradient(135deg,#1b2a4e,#1d1644);color:var(--text);border-color:#6272ff}.step.done{border-color:#2d9f67;color:#caffe2}.main{padding:26px;max-width:1400px}.hero{display:flex;justify-content:space-between;gap:20px;align-items:flex-start;margin-bottom:20px}.hero h2{font-size:30px;margin:0 0 8px}.hero p{color:var(--muted);margin:0;max-width:760px}.grid{display:grid;grid-template-columns:repeat(12,1fr);gap:16px}.card{background:linear-gradient(180deg,#131d33,#0f1728);border:1px solid var(--line);border-radius:22px;padding:18px;box-shadow:0 12px 40px #0005}.span4{grid-column:span 4}.span6{grid-column:span 6}.span8{grid-column:span 8}.span12{grid-column:span 12}.card h3{margin:0 0 12px;font-size:17px}.field{display:flex;flex-direction:column;gap:7px;margin:10px 0}.field label{font-size:12px;color:var(--muted);font-weight:700}.field input,.field select{width:100%;background:#0b1222;border:1px solid var(--line);color:var(--text);border-radius:13px;padding:12px}.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.row > *{flex:1}.muted{color:var(--muted)}.small{font-size:12px}.pill{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--chip);border-radius:99px;padding:7px 10px;color:#cdd8f6;font-size:12px;font-weight:700}.pill.ok{border-color:#25764f;color:#caffe2}.pill.warn{border-color:#806826;color:#ffe6a2}.pill.err{border-color:#8f3440;color:#ffd6d9}.progress{height:13px;border-radius:99px;background:#070b15;overflow:hidden;border:1px solid var(--line)}.bar{height:100%;width:0;background:linear-gradient(90deg,var(--accent),var(--accent2));transition:width .25s}.stats{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}.stat{background:#0c1324;border:1px solid var(--line);padding:12px;border-radius:16px}.stat b{display:block;font-size:24px}.stat span{color:var(--muted);font-size:12px}.tableWrap{overflow:auto;border:1px solid var(--line);border-radius:16px}table{width:100%;border-collapse:collapse;font-size:13px}th,td{text-align:left;padding:10px;border-bottom:1px solid #22304c;vertical-align:top}th{color:#cfe2ff;background:#121b30;position:sticky;top:0}tr:last-child td{border-bottom:0}.log{height:330px;overflow:auto;background:#070b15;border:1px solid var(--line);border-radius:16px;padding:12px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;white-space:pre-wrap}.guideBox{max-height:520px;overflow:auto;background:#070b15;border:1px solid var(--line);border-radius:16px;padding:14px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;line-height:1.55;white-space:pre-wrap}.check{display:flex;gap:10px;align-items:flex-start;background:#0c1324;border:1px solid var(--line);border-radius:16px;padding:12px;margin-top:10px}.check input{margin-top:4px;transform:scale(1.2)}.hidden{display:none}.phase{display:flex;gap:8px;flex-wrap:wrap}.phase .pill{opacity:.6}.phase .pill.active{opacity:1;border-color:#6ee7f9}.phase .pill.done{opacity:1;border-color:#44d07b}.footerActions{position:sticky;bottom:0;background:linear-gradient(180deg,transparent,#070a14 30%);padding-top:16px;margin-top:14px;display:flex;gap:10px;justify-content:flex-end}@media(max-width:900px){.app{grid-template-columns:1fr}.side{position:relative;height:auto}.grid{grid-template-columns:1fr}.span4,.span6,.span8,.span12{grid-column:span 1}.stats{grid-template-columns:repeat(2,1fr)}.hero{flex-direction:column}}
   </style>
 </head>
 <body>
-<div class="wrap">
-  <section class="hero">
-    <div class="card">
-      <div class="badge"><span class="dot"></span> Lokalmart Universal Importer + Odoo Autopsy V7</div>
-      <h1>Import semua XLSX Lokalmart, lalu export autopsy penuh database Odoo.</h1>
-      <p>V7 mempertahankan fitur import V6 dan menambah tombol <b>Export Full Autopsy XLSX</b> untuk membaca pages, menu, QWeb, produk, partner, project, field, link internal, dan issue otomatis.</p>
-      <div class="btns">
-        <button class="primary" id="btnTest">Test koneksi</button>
-        <button class="blue" id="btnScanModels">Scan Models & Fields</button>
-        <button class="orange" id="btnChooseImport">Pilih XLSX/JSON</button>
-        <button class="purple" id="btnImport">Import ke Odoo</button>
-        <button class="ghost" id="btnDryRun">Dry Run / Validasi</button>
-        <button class="danger" id="btnAudit">Export Full Autopsy XLSX</button>
-        <button class="ghost" id="btnExportTemplate">Export Template</button>
-        <input id="importFile" class="hidden" type="file" accept=".xlsx,.xls,.json,application/json"/>
+<div class="app">
+  <aside class="side">
+    <div class="brand"><div class="logo"></div><div><h1>Lokalmart<br/>Importer Studio</h1><p>Native-like XLSX importer v1.0.3</p></div></div>
+    <div class="steps" id="steps"></div>
+    <div style="height:18px"></div>
+    <div class="card" style="padding:14px">
+      <b>Mode Super Cepat</b>
+      <p class="muted small">Memakai bulk import <code>load()</code> Odoo per model. Cocok untuk banyak field dan banyak data. Field custom tetap diproses khusus agar konflik tipe tidak menghentikan seluruh import.</p>
+    </div>
+  </aside>
+  <main class="main">
+    <section class="hero">
+      <div><h2>Import XLSX Odoo dengan flow jelas</h2><p>Upload, preview, preflight, import schema, master data, produk, supplier, lalu foto otomatis dengan feedback per batch.</p></div>
+      <div class="row" style="min-width:260px"><button id="btnRun" disabled>Mulai Import</button><button id="btnStop" class="danger" disabled>Stop</button></div>
+    </section>
+
+    <section class="grid">
+      <div class="card span4">
+        <h3>1. Target Odoo</h3>
+        <div class="field"><label>URL</label><input id="url" placeholder="https://edu-lokalmart.odoo.com" /></div>
+        <div class="field"><label>Database</label><input id="db" placeholder="nama-db" /></div>
+        <div class="field"><label>Username</label><input id="username" placeholder="email user Odoo" /></div>
+        <div class="field"><label>Password / API Key</label><input id="password" type="password" /></div>
+        <button class="secondary" id="btnTest">Tes Koneksi</button>
+        <p id="connStatus" class="muted small"></p>
       </div>
-    </div>
-    <div class="card">
-      <h2>Koneksi Odoo</h2>
-      <div class="grid2">
-        <label>Odoo URL<input id="baseUrl" value="https://edu-lokalmart.odoo.com" placeholder="https://edu-lokalmart.odoo.com"/></label>
-        <label>Database<input id="db" placeholder="Nama database Odoo"/></label>
-        <label>Login Admin<input id="login" placeholder="Email/login admin"/></label>
-        <label>Password / API Key<input id="password" type="password" placeholder="Password atau API key"/></label>
+
+      <div class="card span4">
+        <h3>2. Upload XLSX</h3>
+        <div class="field"><label>File XLSX</label><input id="file" type="file" accept=".xlsx,.xls" /></div>
+        <div class="row"><button class="secondary" id="btnPreview" disabled>Preview</button><button class="secondary" id="btnPreflight" disabled>Preflight</button></div>
+        <p id="fileStatus" class="muted small">Belum ada file.</p>
       </div>
-      <p class="small" style="margin-top:10px">Credential tidak disimpan. Untuk audit pilot, data yang dibaca akan diekspor ke file XLSX di komputer Anda.</p>
-    </div>
-  </section>
 
-  <section class="grid4" style="margin-bottom:16px">
-    <div class="kpi"><b id="kpiSheets">0</b><span>Sheets terbaca</span></div>
-    <div class="kpi"><b id="kpiRows">0</b><span>Rows siap import</span></div>
-    <div class="kpi"><b id="kpiModels">0</b><span>Models terdeteksi</span></div>
-    <div class="kpi"><b id="kpiErrors">0</b><span>Warnings / Errors</span></div>
-  </section>
-
-  <section class="grid2" style="margin-bottom:16px">
-    <div class="card">
-      <h2>Upload XLSX / JSON</h2>
-      <div id="drop" class="drop"><strong>Tarik file ke sini</strong><span>atau klik tombol “Pilih XLSX/JSON”.</span></div>
-      <p class="small" id="fileInfo" style="margin-top:10px">Belum ada file dipilih.</p>
-    </div>
-    <div class="card">
-      <h2>Standar sheet universal</h2>
-      <pre>Nama sheet = nama model Odoo, contoh: project.task
-
-Kolom khusus:
-_action       upsert / create / update / delete / skip
-_external_id  external id stabil, contoh lokalmart_importer.page_scan
-_match        field pencari, contoh name,project_id
-_model        opsional bila sheet bukan nama model
-
-Relasi:
-project_id       nama/id/xmlid otomatis
-project_id/id    paksa ID
-project_id/name  paksa nama
-tag_ids          many2many dipisah koma</pre>
-    </div>
-  </section>
-
-  <section class="grid2" style="margin-bottom:16px">
-    <div class="card">
-      <h2>Model scanner/importer</h2>
-      <textarea id="modelList">website.page
-website.menu
-ir.ui.view
-ir.model
-ir.model.fields
-project.project
-project.task
-project.milestone
-account.analytic.account
-account.analytic.line
-product.template
-product.product
-product.category
-res.partner
-crm.lead
-slide.channel
-slide.slide
-knowledge.article
-calendar.event
-mail.activity.type</textarea>
-    </div>
-    <div class="card">
-      <h2>Autopsy database Odoo</h2>
-      <p>Model di bawah ini akan diekspor ke XLSX lengkap bersama issue otomatis dan link checker.</p>
-      <textarea id="auditModelList">website.page
-website.menu
-ir.ui.view
-website
-website.redirect
-product.template
-product.product
-product.category
-res.partner
-crm.lead
-project.project
-project.task
-project.milestone
-account.analytic.account
-account.analytic.line
-slide.channel
-slide.slide
-knowledge.article
-calendar.event
-mail.activity.type
-ir.model
-ir.model.fields
-ir.model.data</textarea>
-      <div class="grid2" style="margin-top:10px">
-        <label>Limit per model<input id="auditLimit" type="number" value="1500" min="50" max="5000"/></label>
-        <label>Opsi audit<select id="auditMode"><option value="normal">Normal + HTML/QWeb</option><option value="light">Ringan tanpa arch/html</option><option value="allfields">Semua field yang bisa dibaca</option></select></label>
+      <div class="card span4">
+        <h3>3. Strategi Import</h3>
+        <div class="field"><label>Mode</label><select id="mode"><option value="super_fast">Super Cepat - Native-like load()</option><option value="normal">Aman - Upsert row-by-row</option></select></div>
+        <div class="field"><label>Batch Data</label><input id="batchSize" type="number" min="1" max="500" value="80" /></div>
+        <div class="field"><label>Batch Foto</label><input id="photoBatchSize" type="number" min="1" max="50" value="8" /></div>
+        <label class="check"><input id="continueOnError" type="checkbox" checked/><span><b>Lanjut walau ada error</b><br/><span class="muted small">Error dicatat, batch berikutnya tetap lanjut.</span></span></label>
+        <label class="check"><input id="importPhotos" type="checkbox" checked/><span><b>Import foto setelah produk terbuat</b><br/><span class="muted small">Foto menunggu product.template berhasil created/updated.</span></span></label>
       </div>
-    </div>
-  </section>
 
-  <section class="card">
-    <div class="tabs">
-      <button class="tab active" data-tab="preview">Preview</button>
-      <button class="tab" data-tab="models">Models</button>
-      <button class="tab" data-tab="fields">Fields</button>
-      <button class="tab" data-tab="result">Result</button>
-      <button class="tab" data-tab="log">Log</button>
-    </div>
-    <div id="tab-preview"><div id="previewTable"></div></div>
-    <div id="tab-models" class="hidden"><div id="modelsTable"></div></div>
-    <div id="tab-fields" class="hidden"><div id="fieldsTable"></div></div>
-    <div id="tab-result" class="hidden"><div id="resultTable"></div></div>
-    <div id="tab-log" class="hidden"><pre id="log"></pre></div>
-  </section>
+      <div class="card span12">
+        <h3>Status Fase</h3>
+        <div class="phase" id="phasePills"></div>
+        <div style="height:12px"></div>
+        <div class="progress"><div class="bar" id="overallBar"></div></div>
+        <p class="muted small" id="currentStatus">Belum mulai.</p>
+        <div class="stats" style="margin-top:12px">
+          <div class="stat"><b id="stProcessed">0</b><span>Processed</span></div>
+          <div class="stat"><b id="stCreated">0</b><span>Created</span></div>
+          <div class="stat"><b id="stUpdated">0</b><span>Updated/Upserted</span></div>
+          <div class="stat"><b id="stSkipped">0</b><span>Skipped</span></div>
+          <div class="stat"><b id="stErrors">0</b><span>Errors</span></div>
+        </div>
+      </div>
+
+      <div class="card span8">
+        <h3>Preview Sheet</h3>
+        <div class="tableWrap"><table><thead><tr><th>Urutan</th><th>Sheet</th><th>Model</th><th>Rows</th><th>Status</th></tr></thead><tbody id="previewBody"><tr><td colspan="5" class="muted">Belum preview.</td></tr></tbody></table></div>
+      </div>
+
+      <div class="card span4">
+        <h3>Foto Produk</h3>
+        <p class="muted small">Status khusus foto akan muncul setelah product.template selesai.</p>
+        <div class="stats" style="grid-template-columns:repeat(2,1fr)">
+          <div class="stat"><b id="phQueued">0</b><span>Queued</span></div>
+          <div class="stat"><b id="phDone">0</b><span>Done</span></div>
+          <div class="stat"><b id="phFailed">0</b><span>Failed</span></div>
+          <div class="stat"><b id="phMissing">0</b><span>Target Missing</span></div>
+        </div>
+        <p id="photoStatus" class="muted small">Menunggu import.</p>
+        <button class="secondary" id="btnRunPhotosOnly" disabled style="width:100%;margin-top:10px">Retry / Import Foto Saja</button>
+        <p class="muted small">Gunakan tombol ini untuk menjalankan ulang <code>photo_import_queue</code> tanpa mengulang import produk.</p>
+      </div>
+
+
+      <div class="card span12">
+        <h3>Panduan ChatGPT XLSX Lokalmart</h3>
+        <p class="muted small">Panduan ini harus diikuti setiap kali ChatGPT membuat file XLSX untuk Importer Studio. Termasuk pencegahan error boolean Odoo <code>bool has no lower</code>, aturan photo_import_queue, external ID, dan mode Super Cepat.</p>
+        <div class="row" style="margin-bottom:12px">
+          <button class="secondary" id="btnLoadGuide">Tampilkan Panduan TXT</button>
+          <a href="/docs/CHATGPT_XLSX_GUIDE.txt" target="_blank"><button class="secondary" type="button">Buka TXT</button></a>
+          <a href="/docs/CHATGPT_XLSX_GUIDE.txt" download><button class="secondary" type="button">Download TXT</button></a>
+        </div>
+        <div class="guideBox hidden" id="guideBox">Klik “Tampilkan Panduan TXT”.</div>
+      </div>
+
+      <div class="card span12">
+        <h3>Log Operasional</h3>
+        <div class="log" id="log"></div>
+        <div class="footerActions"><button class="secondary" id="btnDownloadLog">Download Log JSON</button></div>
+      </div>
+    </section>
+  </main>
 </div>
 
 <script>
-(function(){
-  const state={uid:null,workbook:null,fileName:"",groups:[],modelFields:{},modelInfo:{},scannedModels:[],scannedFields:[],results:[],warnings:[]};
-  const $=id=>document.getElementById(id);
-  function log(msg,data){const line=`[${new Date().toLocaleTimeString()}] ${msg}`+(data===undefined?"":"\n"+(typeof data==="string"?data:JSON.stringify(data,null,2)));$("log").textContent=line+"\n\n"+$("log").textContent;}
-  function warn(msg,data){state.warnings.push({time:new Date().toISOString(),msg,data});log("WARNING: "+msg,data);renderKpis();}
-  function getCreds(){return{baseUrl:$("baseUrl").value.trim().replace(/\/+$/,"") ,db:$("db").value.trim(),login:$("login").value.trim(),password:$("password").value};}
-  async function rpc(model,method,args=[],kwargs={}){const res=await fetch("/api/odoo",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({...getCreds(),uid:state.uid,model,method,args,kwargs})});const p=await res.json().catch(()=>({ok:false,error:"Invalid JSON response"}));if(!p.ok)throw new Error(p.error||"RPC failed");if(p.uid)state.uid=p.uid;return p.result;}
-  async function testConnection(){const res=await fetch("/api/odoo",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(getCreds())});const p=await res.json();if(!p.ok)throw new Error(p.error||"Authentication failed");state.uid=p.uid;log("Koneksi Odoo berhasil.",{uid:state.uid});return p.uid;}
-  function esc(v){return String(v==null?"":v).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/\"/g,"&quot;");}
-  function table(rows,cols){if(!rows||!rows.length)return '<p class="small">Belum ada data.</p>';return `<table><thead><tr>${cols.map(c=>`<th>${esc(c.label)}</th>`).join("")}</tr></thead><tbody>`+rows.map(r=>`<tr>${cols.map(c=>`<td>${c.render?c.render(r):esc(r[c.key])}</td>`).join("")}</tr>`).join("")+`</tbody></table>`;}
-  function renderKpis(){ $("kpiSheets").textContent=state.groups.length;$("kpiRows").textContent=state.groups.reduce((n,g)=>n+g.rows.length,0);$("kpiModels").textContent=new Set(state.groups.map(g=>g.model).filter(Boolean)).size;$("kpiErrors").textContent=state.warnings.length; }
-  function renderPreview(){const rows=state.groups.map(g=>({sheet:g.sheet,model:g.model,rows:g.rows.length,columns:g.headers.join(", ").slice(0,260)}));$("previewTable").innerHTML=table(rows,[{key:"sheet",label:"Sheet"},{key:"model",label:"Model",render:r=>`<span class="mono">${esc(r.model)}</span>`},{key:"rows",label:"Rows"},{key:"columns",label:"Columns"}]);}
-  function renderModels(){$("modelsTable").innerHTML=table(state.scannedModels,[{key:"model",label:"Model",render:r=>`<span class="mono">${esc(r.model)}</span>`},{key:"name",label:"Name"},{key:"status",label:"Status",render:r=>r.status==="OK"?'<span class="pill ok">OK</span>':'<span class="pill bad">Missing/Error</span>'},{key:"field_count",label:"Fields"},{key:"error",label:"Error"}]);}
-  function renderFields(){$("fieldsTable").innerHTML=table(state.scannedFields.slice(0,1000),[{key:"model",label:"Model",render:r=>`<span class="mono">${esc(r.model)}</span>`},{key:"name",label:"Field",render:r=>`<span class="mono">${esc(r.name)}</span>`},{key:"string",label:"Label"},{key:"type",label:"Type"},{key:"relation",label:"Relation",render:r=>`<span class="mono">${esc(r.relation)}</span>`},{key:"required",label:"Req"},{key:"readonly",label:"Readonly"}]);}
-  function renderResults(){$("resultTable").innerHTML=table(state.results.slice(0,1000),[{key:"model",label:"Model",render:r=>`<span class="mono">${esc(r.model)}</span>`},{key:"action",label:"Action"},{key:"status",label:"Status",render:r=>r.status==="created"||r.status==="updated"?`<span class="pill ok">${esc(r.status)}</span>`:r.status==="error"?'<span class="pill bad">error</span>':`<span class="pill warn">${esc(r.status)}</span>`},{key:"id",label:"Odoo ID"},{key:"external_id",label:"External ID"},{key:"message",label:"Message"}]);}
-  function renderAll(){renderKpis();renderPreview();renderModels();renderFields();renderResults();}
-  function normalizeHeader(h){const raw=String(h||"").trim();const map={"External ID":"_external_id",external_id:"_external_id",xml_id:"_external_id","XML ID":"_external_id","Odoo ID":"_odoo_id",odoo_id:"_odoo_id",Action:"_action",action:"_action",Model:"_model",_model:"_model",_action:"_action",_external_id:"_external_id",_match:"_match",_odoo_id:"_odoo_id",Match:"_match",match:"_match"};return map[raw]||raw;}
-  function sheetNameToModel(s){s=String(s||"").trim();if(/^[a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)+$/i.test(s))return s;const f=s.match(/[a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)+/ig);return f&&f.length?f[f.length-1]:"";}
-  function isEmpty(v){return v===undefined||v===null||(typeof v==="string"&&v.trim()==="");}
-  function cleanCell(v){return v===undefined||v===null?"":(typeof v==="string"?v.trim():v);}
-  function parseBool(v){if(typeof v==="boolean")return v;if(typeof v==="number")return v!==0;const s=String(v||"").trim().toLowerCase();if(["true","yes","ya","y","1","benar"].includes(s))return true;if(["false","no","tidak","n","0","salah"].includes(s))return false;return Boolean(v);}
-  function parseMaybeJson(v){if(typeof v!=="string")return v;const s=v.trim();if(!s)return v;if((s.startsWith("{")&&s.endsWith("}"))||(s.startsWith("[")&&s.endsWith("]"))){try{return JSON.parse(s);}catch(e){return v;}}return v;}
-  function normalizeRows(rows){return rows.map(raw=>{const out={};Object.keys(raw||{}).forEach(k=>{const nk=normalizeHeader(k),v=cleanCell(raw[k]);if(nk)out[nk]=v;});return out;}).filter(r=>Object.values(r).some(v=>!isEmpty(v)));}
-  function parseWorkbook(wb,XLSXLib){const groups=[];wb.SheetNames.forEach(sheetName=>{const rows=XLSXLib.utils.sheet_to_json(wb.Sheets[sheetName],{defval:""});const clean=normalizeRows(rows);if(!clean.length)return;let model=clean.find(r=>r._model)?._model||sheetNameToModel(sheetName);if(!model){warn(`Sheet tidak punya nama model: ${sheetName}`);return;}groups.push({sheet:sheetName,model:String(model).trim(),headers:Array.from(new Set(clean.flatMap(r=>Object.keys(r)))),rows:clean});});return groups;}
-  async function readImportFile(file){if(!file)return;state.fileName=file.name;state.warnings=[];state.results=[];const lower=file.name.toLowerCase();if(lower.endsWith(".json")){const json=JSON.parse(await file.text());const groups=[];if(Array.isArray(json)){const rows=normalizeRows(json);groups.push({sheet:"json",model:rows.find(r=>r._model)?._model||"",headers:Array.from(new Set(rows.flatMap(r=>Object.keys(r)))),rows});}else if(json&&typeof json==="object"){Object.entries(json).forEach(([model,arr])=>{if(Array.isArray(arr)){const rows=normalizeRows(arr);groups.push({sheet:model,model,headers:Array.from(new Set(rows.flatMap(r=>Object.keys(r)))),rows});}});}state.groups=groups;}else{const XLSXLib=await getXLSX();const buf=await file.arrayBuffer();const wb=XLSXLib.read(buf,{type:"array"});state.workbook=wb;state.groups=parseWorkbook(wb,XLSXLib);}$("fileInfo").textContent=`${file.name} — ${state.groups.length} sheet import terbaca.`;log("File terbaca.",{file:file.name,groups:state.groups.map(g=>({sheet:g.sheet,model:g.model,rows:g.rows.length}))});renderAll();}
-  async function modelExists(model){try{const r=await rpc("ir.model","search_read",[[["model","=",model]]],{fields:["id","model","name"],limit:1});return r&&r.length?r[0]:null;}catch(e){return null;}}
-  async function fieldsGet(model){if(state.modelFields[model])return state.modelFields[model];state.modelFields[model]=await rpc(model,"fields_get",[],{attributes:["string","type","required","readonly","relation","selection","store"]});return state.modelFields[model]||{};}
-  async function scanModels(){await testConnection();state.scannedModels=[];state.scannedFields=[];const models=$("modelList").value.split(/\n|,/).map(x=>x.trim()).filter(Boolean);for(const model of models){try{const info=await modelExists(model);if(!info){state.scannedModels.push({model,name:"",status:"MISSING",field_count:0,error:"Model tidak ditemukan / tidak punya akses"});continue;}const f=await fieldsGet(model);const rows=Object.entries(f).map(([name,meta])=>({model,name,string:meta.string||"",type:meta.type||"",relation:meta.relation||"",required:!!meta.required,readonly:!!meta.readonly}));state.scannedFields.push(...rows);state.scannedModels.push({model,name:info.name,status:"OK",field_count:rows.length,error:""});}catch(e){state.scannedModels.push({model,name:"",status:"ERROR",field_count:0,error:e.message});}renderModels();renderFields();}log("Scan models selesai.",{models:state.scannedModels.length,fields:state.scannedFields.length});renderAll();}
-  function parseXmlid(xmlid){const s=String(xmlid||"").trim();if(!s)return null;if(s.includes(".")){const i=s.indexOf(".");return{module:s.slice(0,i),name:s.slice(i+1)};}return{module:"lokalmart_importer",name:s.replace(/[^a-zA-Z0-9_]/g,"_").replace(/^_+/,"").slice(0,120)};}
-  async function resolveXmlid(xmlid,expectedModel){const p=parseXmlid(xmlid);if(!p)return null;const r=await rpc("ir.model.data","search_read",[[["module","=",p.module],["name","=",p.name]]],{fields:["id","module","name","model","res_id"],limit:1});if(!r.length)return null;if(expectedModel&&r[0].model&&r[0].model!==expectedModel)warn(`External ID model berbeda: ${xmlid}`,{expectedModel,foundModel:r[0].model});return r[0].res_id||null;}
-  async function ensureXmlid(xmlid,model,resId){if(!xmlid||!model||!resId)return;const p=parseXmlid(xmlid);if(!p)return;try{const ex=await rpc("ir.model.data","search_read",[[["module","=",p.module],["name","=",p.name]]],{fields:["id"],limit:1});const vals={module:p.module,name:p.name,model,res_id:resId,noupdate:false};if(ex.length)await rpc("ir.model.data","write",[[ex[0].id],vals],{});else await rpc("ir.model.data","create",[vals],{});}catch(e){warn("Gagal membuat/update external id.",{xmlid,model,resId,error:e.message});}}
-  async function nameSearch(model,value){const s=String(value||"").trim();if(!s)return null;try{const r=await rpc(model,"name_search",[s,[],"ilike",1],{});if(r&&r.length)return r[0][0];}catch(e){}try{const r=await rpc(model,"search_read",[[["name","=",s]]],{fields:["id","name"],limit:1});if(r&&r.length)return r[0].id;}catch(e){}return null;}
-  async function resolveMany2one(rel,value,hint){if(isEmpty(value))return false;const raw=parseMaybeJson(value);if(typeof raw==="number")return raw;const s=String(raw).trim();if(!s)return false;if(hint==="id"||/^\d+$/.test(s))return Number(s);if(hint==="xmlid")return await resolveXmlid(s,rel);if(rel==="ir.model"){const r=await rpc("ir.model","search_read",[[["model","=",s]]],{fields:["id"],limit:1});if(r.length)return r[0].id;}if(!hint&&/^[a-zA-Z_][a-zA-Z0-9_]*\.[a-zA-Z0-9_.-]+$/.test(s)){const id=await resolveXmlid(s,rel);if(id)return id;}return await nameSearch(rel,s);}
-  async function resolveMany2many(rel,value,hint){if(isEmpty(value))return [[6,0,[]]];const raw=parseMaybeJson(value);const items=Array.isArray(raw)?raw:String(value).split(",").map(x=>x.trim()).filter(Boolean);const ids=[];for(const item of items){const id=await resolveMany2one(rel,item,hint);if(id)ids.push(id);}return [[6,0,ids]];}
-  function splitFieldHint(header){const h=String(header||"").trim();if(h.includes("/")){const p=h.split("/");return{field:p[0].trim(),hint:(p[1]||"").trim().toLowerCase()};}return{field:h,hint:""};}
-  function modelProfileMatch(model,rawRow,values){const profiles={"website.page":["url","key","name"],"website.menu":["url","name"],"ir.ui.view":["key","name"],"ir.model.fields":["model_id","name"],"project.project":["name"],"project.task":["name","project_id"],"project.milestone":["name","project_id"],"product.template":["barcode","default_code","name"],"product.product":["barcode","default_code"],"product.category":["name"],"res.partner":["email","phone","mobile","name"],"crm.lead":["name","email_from","phone"],"slide.channel":["name"],"slide.slide":["name","channel_id"],"account.analytic.account":["name"],"account.analytic.line":["name","date","account_id"]};return rawRow._match?String(rawRow._match).split(",").map(x=>x.trim()).filter(Boolean):(profiles[model]||["name"]);}
-  async function buildValues(model,rawRow){const fields=await fieldsGet(model),values={},skipped=[],row={...rawRow};if(model==="ir.model.fields"&&row.model&&!row.model_id)row.model_id=row.model;for(const [rawHeader,rawValue] of Object.entries(row)){if(rawHeader.startsWith("_"))continue;if(["id","External ID","external_id","odoo_id"].includes(rawHeader))continue;if(isEmpty(rawValue))continue;const {field,hint}=splitFieldHint(rawHeader);if(!fields[field]){skipped.push({field,reason:"Field tidak ada pada model"});continue;}const meta=fields[field],type=meta.type;try{if(["char","text","html","selection","date","datetime","binary"].includes(type))values[field]=String(rawValue);else if(type==="integer")values[field]=Number(rawValue||0);else if(["float","monetary"].includes(type))values[field]=Number(rawValue||0);else if(type==="boolean")values[field]=parseBool(rawValue);else if(type==="many2one")values[field]=await resolveMany2one(meta.relation,rawValue,hint)||false;else if(type==="many2many")values[field]=await resolveMany2many(meta.relation,rawValue,hint);else if(type==="one2many"){const parsed=parseMaybeJson(rawValue);Array.isArray(parsed)?values[field]=parsed:skipped.push({field,reason:"one2many butuh JSON command Odoo"});}else values[field]=parseMaybeJson(rawValue);}catch(e){skipped.push({field,reason:e.message});}}return{values,skipped};}
-  async function findExisting(model,rawRow,values){if(rawRow._odoo_id&&/^\d+$/.test(String(rawRow._odoo_id)))return Number(rawRow._odoo_id);if(rawRow.odoo_id&&/^\d+$/.test(String(rawRow.odoo_id)))return Number(rawRow.odoo_id);if(rawRow.id&&/^\d+$/.test(String(rawRow.id)))return Number(rawRow.id);const externalId=rawRow._external_id||rawRow.external_id||rawRow.id;if(externalId&&String(externalId).trim()&&!/^\d+$/.test(String(externalId))){const id=await resolveXmlid(externalId,model);if(id)return id;}const domain=[];for(const f of modelProfileMatch(model,rawRow,values)){if(values[f]!==undefined&&values[f]!==false&&values[f]!=="")domain.push([f,"=",values[f]]);}if(domain.length){try{const r=await rpc(model,"search_read",[domain],{fields:["id"],limit:1});if(r.length)return r[0].id;}catch(e){}}return null;}
-  async function importOneRow(model,rawRow,dryRun){const action=String(rawRow._action||"upsert").trim().toLowerCase(),externalId=rawRow._external_id||rawRow.external_id||rawRow.id||"";if(!model)return{model:"",action,status:"error",id:"",external_id:externalId,message:"Model kosong."};if(action==="skip")return{model,action,status:"skipped",id:"",external_id:externalId,message:"Row dilewati."};if(!(await modelExists(model)))return{model,action,status:"error",id:"",external_id:externalId,message:"Model tidak ditemukan / tidak punya akses."};const built=await buildValues(model,rawRow),values=built.values;if(built.skipped.length)warn(`Sebagian kolom dilewati pada ${model}.`,{row:rawRow,skipped:built.skipped});const existingId=await findExisting(model,rawRow,values);if(dryRun)return{model,action,status:"dry_run",id:existingId||"",external_id:externalId,message:existingId?"Akan update record existing.":"Akan create record baru."};if(action==="delete"||action==="unlink"){if(!existingId)return{model,action,status:"skipped",id:"",external_id:externalId,message:"Existing tidak ditemukan."};await rpc(model,"unlink",[[existingId]],{});return{model,action,status:"deleted",id:existingId,external_id:externalId,message:"Record dihapus."};}if(action==="update"){if(!existingId)return{model,action,status:"error",id:"",external_id:externalId,message:"_action=update tetapi existing tidak ditemukan."};await rpc(model,"write",[[existingId],values],{});if(externalId)await ensureXmlid(externalId,model,existingId);return{model,action,status:"updated",id:existingId,external_id:externalId,message:"Record diupdate."};}if(action==="create"){const newId=await rpc(model,"create",[values],{});if(externalId)await ensureXmlid(externalId,model,newId);return{model,action,status:"created",id:newId,external_id:externalId,message:"Record dibuat."};}if(existingId){await rpc(model,"write",[[existingId],values],{});if(externalId)await ensureXmlid(externalId,model,existingId);return{model,action:"upsert",status:"updated",id:existingId,external_id:externalId,message:"Record existing diupdate."};}const newId=await rpc(model,"create",[values],{});if(externalId)await ensureXmlid(externalId,model,newId);return{model,action:"upsert",status:"created",id:newId,external_id:externalId,message:"Record baru dibuat."};}
-  function groupSortPriority(model){return({"ir.model":1,"ir.model.fields":2,"ir.ui.view":3,"website.page":4,"website.menu":5,"res.partner":10,"product.category":11,"product.template":12,"product.product":13,"project.project":20,"project.milestone":21,"project.task":22,"account.analytic.account":30,"account.analytic.line":31,"slide.channel":40,"slide.slide":41,"crm.lead":50}[model]||100);}
-  async function runImport(dryRun){if(!state.groups.length){alert("Belum ada file. Pilih XLSX/JSON dulu.");return;}await testConnection();state.results=[];renderResults();const groups=[...state.groups].sort((a,b)=>groupSortPriority(a.model)-groupSortPriority(b.model));log(dryRun?"Dry run dimulai.":"Import dimulai.",{groups:groups.map(g=>({model:g.model,rows:g.rows.length}))});for(const group of groups){for(let i=0;i<group.rows.length;i++){const rawRow=group.rows[i],model=String(rawRow._model||group.model||"").trim();try{const result=await importOneRow(model,rawRow,dryRun);state.results.push(result);log(`${result.status.toUpperCase()} ${model}`,result);}catch(e){const result={model,action:rawRow._action||"upsert",status:"error",id:"",external_id:rawRow._external_id||rawRow.id||"",message:e.message};state.results.push(result);warn(`Gagal import ${model} row ${i+1}.`,{error:e.message,row:rawRow});}renderResults();renderKpis();}}log(dryRun?"Dry run selesai.":"Import selesai.",{total:state.results.length,created:state.results.filter(r=>r.status==="created").length,updated:state.results.filter(r=>r.status==="updated").length,error:state.results.filter(r=>r.status==="error").length});alert(dryRun?"Dry run selesai. Lihat Result/Log.":"Import selesai. Lihat Result/Log.");}
-  async function exportTemplate(){const XLSXLib=await getXLSX();const wb=XLSXLib.utils.book_new();XLSXLib.utils.book_append_sheet(wb,XLSXLib.utils.aoa_to_sheet([["Lokalmart Universal Importer V7"],["Sheet gunakan nama model Odoo."],["Kolom khusus: _action, _external_id, _match, _model"]]),"00_README");XLSXLib.utils.book_append_sheet(wb,XLSXLib.utils.json_to_sheet([{_action:"upsert",_external_id:"lokalmart_importer.project_ground_zero",_match:"name",name:"Ground Zero Lokalmart",description:"Project induk Lokalmart."}]),"project.project");XLSXLib.utils.book_append_sheet(wb,XLSXLib.utils.json_to_sheet([{_action:"upsert",_external_id:"lokalmart_importer.task_scan_page",_match:"name,project_id",name:"Bangun halaman /scan Lokalmart",project_id:"Ground Zero Lokalmart",description:"Membuat page scan barcode, QR, dan Lokal ID.",priority:"1"}]),"project.task");XLSXLib.writeFile(wb,"lokalmart_universal_import_template_v7.xlsx");}
-async function exportFullAudit(){
-  log("Mulai export full autopsy Odoo...");
+const API = '/api/odoo';
+const phaseList = ['connection','upload','preview','preflight','schema','master','products','relations','photos','report'];
+const phaseLabels = {connection:'Koneksi',upload:'Upload',preview:'Preview',preflight:'Preflight',schema:'Schema/Fields',master:'Master Data',products:'Produk',relations:'Relasi',photos:'Foto',report:'Laporan'};
+let state = { fileBase64:null, fileName:'', preview:null, logs:[], stopped:false, stats:{processed:0,created:0,updated:0,skipped:0,errors:0}, currentPhase:'connection', donePhases:new Set(), photo:{queued:0,done:0,failed:0,missing:0} };
 
-  const modelText = $("auditModelList")
-    ? $("auditModelList").value
-    : $("modelList").value;
+const $ = id => document.getElementById(id);
+function target(){return {url:$('url').value.trim(),db:$('db').value.trim(),username:$('username').value.trim(),password:$('password').value};}
+function options(){return {continueOnError:$('continueOnError').checked, skipExistingFields:true, importPhotosAfterProducts:$('importPhotos').checked, disableTracking:true, imageRetryAttempts:3, imageRetryBaseDelayMs:1200, imageDelayMs:350};}
+function log(msg, data){const item={time:new Date().toISOString(),msg,data:data||null};state.logs.push(item);$('log').textContent=state.logs.map(x=>`[${x.time.slice(11,19)}] ${x.msg}${x.data?'\n'+JSON.stringify(x.data,null,2):''}`).join('\n');$('log').scrollTop=$('log').scrollHeight;}
+function setPhase(p){state.currentPhase=p;renderPhases();}
+function donePhase(p){state.donePhases.add(p);renderPhases();}
+function renderSteps(){ $('steps').innerHTML=phaseList.map(p=>`<div class="step ${state.currentPhase===p?'active':''} ${state.donePhases.has(p)?'done':''}"><span>${phaseLabels[p]}</span><span>${state.donePhases.has(p)?'✓':state.currentPhase===p?'●':'○'}</span></div>`).join('');}
+function renderPhases(){renderSteps();$('phasePills').innerHTML=phaseList.map(p=>`<span class="pill ${state.currentPhase===p?'active':''} ${state.donePhases.has(p)?'done':''}">${state.donePhases.has(p)?'✓':state.currentPhase===p?'●':'○'} ${phaseLabels[p]}</span>`).join('');}
+function addStats(r){if(!r)return;state.stats.processed+=(r.processed||0);state.stats.created+=(r.created||0);state.stats.updated+=(r.updated||0);state.stats.skipped+=(r.skipped||0);state.stats.errors+=(r.errors?r.errors.length:0);renderStats();}
+function renderStats(){ $('stProcessed').textContent=state.stats.processed; $('stCreated').textContent=state.stats.created; $('stUpdated').textContent=state.stats.updated; $('stSkipped').textContent=state.stats.skipped; $('stErrors').textContent=state.stats.errors; }
+function renderPhoto(){ $('phQueued').textContent=state.photo.queued; $('phDone').textContent=state.photo.done; $('phFailed').textContent=state.photo.failed; $('phMissing').textContent=state.photo.missing; }
+function setOverall(done,total){const pct=total?Math.min(100,Math.round(done/total*100)):0;$('overallBar').style.width=pct+'%';$('currentStatus').textContent=`${pct}% — ${done}/${total} row/fase diproses.`;}
+async function post(action,payload={},customTarget){const res=await fetch(API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action,target:customTarget||target(),payload})});const json=await res.json();if(!json.ok)throw new Error(json.error+(json.detail?'\n'+json.detail:''));return json;}
 
-  const modelList = modelText
-    .split(/\n|,/)
-    .map(x => x.trim())
-    .filter(Boolean);
+$('file').addEventListener('change', async e=>{const f=e.target.files[0];if(!f)return;state.fileName=f.name;state.fileBase64=await fileToBase64(f);$('fileStatus').textContent=`${f.name} siap (${Math.round(f.size/1024)} KB)`;$('btnPreview').disabled=false;$('btnPreflight').disabled=false;donePhase('upload');setPhase('preview');log('File XLSX siap dibaca.',{name:f.name,size:f.size});});
+function fileToBase64(file){return new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(String(r.result).split(',').pop());r.onerror=reject;r.readAsDataURL(file);});}
 
-  const limit = $("auditLimit") ? Number($("auditLimit").value || 1500) : 1500;
-  const auditMode = $("auditMode") ? $("auditMode").value : "normal";
-
-  const includeArch = auditMode !== "light";
-  const includeAllFields = auditMode === "all";
-
-  const payload = {
-    ...getCreds(),
-    modelList,
-    limit,
-    includeArch,
-    includeAllFields
-  };
-
-  const response = await fetch("/api/audit", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify(payload)
-  });
-
-  const contentType = response.headers.get("content-type") || "";
-
-  if (!response.ok) {
-    let message = `Audit gagal. HTTP ${response.status}`;
-
-    try {
-      const errorText = await response.text();
-
-      if (contentType.includes("application/json")) {
-        try {
-          const errorJson = JSON.parse(errorText);
-          message = errorJson.error || errorJson.message || errorText;
-        } catch (jsonErr) {
-          message = errorText;
-        }
-      } else {
-        message = errorText;
-      }
-    } catch (readErr) {
-      message = `Audit gagal dan error response tidak bisa dibaca: ${readErr.message}`;
+$('btnTest').onclick=async()=>{try{setPhase('connection');$('connStatus').textContent='Menguji koneksi...';const r=await post('test_connection');$('connStatus').textContent=`✅ Terhubung. UID ${r.uid}${r.version?' — '+(r.version.server_version||''):''}`;donePhase('connection');log('Koneksi Odoo berhasil.',r);}catch(e){$('connStatus').textContent='❌ '+e.message;log('Koneksi gagal.',{error:e.message});}};
+$('btnPreview').onclick=preview;
+async function preview(){if(!state.fileBase64)return;setPhase('preview');const r=await post('preview_xlsx',{fileBase64:state.fileBase64});state.preview=r.sheets;renderPreview();donePhase('preview');$('btnRun').disabled=false;$('btnRunPhotosOnly').disabled=false;log('Preview XLSX selesai.',{sheets:r.sheets.length,total_rows:r.total_rows});}
+function renderPreview(){const rows=state.preview||[];$('previewBody').innerHTML=rows.map((s,i)=>`<tr><td>${i+1}</td><td>${s.sheet}</td><td><code>${s.model}</code></td><td>${s.rows}</td><td><span class="pill ok">Siap</span></td></tr>`).join('')||'<tr><td colspan="5" class="muted">Tidak ada sheet data.</td></tr>';}
+function getPhotoSheet(){
+  const sheets=state.preview||[];
+  return sheets.find(s=>s.model==='photo_import_queue' || s.sheet==='photo_import_queue' || s.sheet==='_photo_import_queue');
+}
+async function runPhotoOnly(){
+  if(!state.preview) await preview();
+  const photoSheet=getPhotoSheet();
+  if(!photoSheet){alert('Tidak ada sheet photo_import_queue.');return;}
+  state.stopped=false;$('btnRunPhotosOnly').disabled=true;$('btnStop').disabled=false;setPhase('photos');
+  state.photo={queued:photoSheet.rows,done:0,failed:0,missing:0};renderPhoto();$('photoStatus').textContent=`Retry foto mulai. ${photoSheet.rows} antrean.`;
+  try{
+    const pBatch=Math.max(1,Number($('photoBatchSize').value||4));
+    for(let offset=0; offset<photoSheet.rows; offset+=pBatch){
+      if(state.stopped) throw new Error('Import dihentikan user.');
+      const r=await post('import_product_images_batch',{fileBase64:state.fileBase64,sheet:photoSheet.sheet,offset,limit:pBatch,options:options()});
+      state.photo.done+=r.report.done||0;state.photo.failed+=r.report.failed||0;state.photo.missing+=r.report.target_missing||0;renderPhoto();
+      $('photoStatus').textContent=`Retry foto ${Math.min(offset+pBatch,photoSheet.rows)}/${photoSheet.rows}. Done ${state.photo.done}, gagal ${state.photo.failed}.`;
+      log(`Retry batch foto selesai offset ${offset}`,r.report);
     }
+    donePhase('photos');setPhase('report');log('Retry/import foto saja selesai.',{photo:state.photo});
+  }catch(e){log('Retry/import foto berhenti/error.',{error:e.message});alert(e.message.slice(0,700));}
+  finally{$('btnRunPhotosOnly').disabled=false;$('btnStop').disabled=true;}
+}
+$('btnRunPhotosOnly').onclick=runPhotoOnly;
+$('btnPreflight').onclick=async()=>{if(!state.fileBase64)return;setPhase('preflight');const r=await post('preflight_xlsx',{fileBase64:state.fileBase64});donePhase('preflight');const pf=r.preflight;log('Preflight selesai.',pf);if(!pf.ok)alert('Preflight menemukan error blocking. Lihat log.');};
 
-    throw new Error(message.slice(0, 3000));
+$('btnStop').onclick=()=>{state.stopped=true;log('User meminta stop setelah batch aktif selesai.');};
+$('btnRun').onclick=runImport;
+async function runImport(){
+  if(!state.preview) await preview();
+  state.stopped=false;$('btnRun').disabled=true;$('btnStop').disabled=false;state.stats={processed:0,created:0,updated:0,skipped:0,errors:0};state.photo={queued:0,done:0,failed:0,missing:0};renderStats();renderPhoto();
+  try{
+    setPhase('preflight');const pf=await post('preflight_xlsx',{fileBase64:state.fileBase64});log('Preflight sebelum import.',pf.preflight);donePhase('preflight');
+    const sheets=state.preview.filter(s=>s.rows>0);
+    const totalRows=sheets.reduce((a,s)=>a+s.rows,0);let globalDone=0;let productSuccess=0;
+    const groups={schema:['ir.model','ir.model.fields','ir.model.access'],master:['res.partner.category','res.partner','product.category','product.public.category','product.tag','product.attribute','product.attribute.value'],products:['product.template'],relations:['product.template.attribute.line','product.supplierinfo','product.image'],photos:['photo_import_queue']};
+    for(const phase of ['schema','master','products','relations']){
+      setPhase(phase);
+      const phaseSheets=sheets.filter(s=>groups[phase].includes(s.model));
+      for(const s of phaseSheets){
+        if(state.stopped) throw new Error('Import dihentikan user.');
+        const mode = ($('mode').value==='super_fast' && s.model!=='ir.model.fields') ? 'import_native_sheet_batch' : 'import_sheet_batch';
+        const batchSize = Math.max(1,Number($('batchSize').value||50));
+        for(let offset=0; offset<s.rows; offset+=batchSize){
+          if(state.stopped) throw new Error('Import dihentikan user.');
+          $('currentStatus').textContent=`${phaseLabels[phase]} — ${s.sheet} row ${offset+1}-${Math.min(offset+batchSize,s.rows)} dari ${s.rows}`;
+          const r=await post(mode,{fileBase64:state.fileBase64,sheet:s.sheet,offset,limit:batchSize,mode:$('mode').value,options:options()});
+          addStats(r.report);globalDone+=r.report.rows||0;setOverall(globalDone,totalRows);
+          if(s.model==='product.template') productSuccess+=(r.report.created||0)+(r.report.updated||0);
+          log(`Batch selesai: ${s.sheet} offset ${offset}`,r.report);
+        }
+      }
+      donePhase(phase);
+    }
+    if($('importPhotos').checked){
+      setPhase('photos');
+      const photoSheet=getPhotoSheet();
+      if(!photoSheet){$('photoStatus').textContent='Tidak ada sheet photo_import_queue.';log('Foto dilewati: sheet photo_import_queue tidak ada.');}
+      else if(productSuccess<=0){$('photoStatus').textContent='Foto tidak dijalankan karena 0 produk created/updated.';log('Foto ditahan: product.template belum berhasil created/updated.');}
+      else{
+        state.photo.queued=photoSheet.rows;renderPhoto();$('photoStatus').textContent=`Foto mulai. ${photoSheet.rows} antrean.`;
+        const pBatch=Math.max(1,Number($('photoBatchSize').value||8));
+        for(let offset=0; offset<photoSheet.rows; offset+=pBatch){
+          if(state.stopped) throw new Error('Import dihentikan user.');
+          const r=await post('import_product_images_batch',{fileBase64:state.fileBase64,sheet:photoSheet.sheet,offset,limit:pBatch,options:options()});
+          state.photo.done+=r.report.done||0;state.photo.failed+=r.report.failed||0;state.photo.missing+=r.report.target_missing||0;renderPhoto();
+          $('photoStatus').textContent=`Foto ${Math.min(offset+pBatch,photoSheet.rows)}/${photoSheet.rows}. Done ${state.photo.done}, gagal ${state.photo.failed}.`;
+          log(`Batch foto selesai offset ${offset}`,r.report);
+        }
+      }
+      donePhase('photos');
+    }
+    setPhase('report');donePhase('report');setOverall(totalRows,totalRows);log('Import selesai.',{stats:state.stats,photo:state.photo});
+  }catch(e){log('Import berhenti/error.',{error:e.message});alert(e.message.slice(0,700));}
+  finally{$('btnRun').disabled=false;$('btnStop').disabled=true;}
+}
+
+$('btnDownloadLog').onclick=()=>{const blob=new Blob([JSON.stringify({file:state.fileName,logs:state.logs,stats:state.stats,photo:state.photo},null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`lokalmart_import_log_${new Date().toISOString().slice(0,19).replace(/[:T]/g,'-')}.json`;a.click();URL.revokeObjectURL(a.href);};
+
+
+$('btnLoadGuide').onclick=async()=>{
+  const box=$('guideBox');
+  box.classList.remove('hidden');
+  if(box.dataset.loaded==='1') return;
+  box.textContent='Memuat panduan...';
+  try{
+    const res=await fetch('/docs/CHATGPT_XLSX_GUIDE.txt');
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    box.textContent=await res.text();
+    box.dataset.loaded='1';
+  }catch(e){
+    box.textContent='Gagal memuat panduan TXT: '+e.message;
   }
+};
 
-  const blob = await response.blob();
-
-  if (!blob || blob.size === 0) {
-    throw new Error("Audit berhasil dipanggil, tetapi file XLSX kosong.");
-  }
-
-  let filename = `lokalmart_odoo_full_autopsy_${new Date().toISOString().slice(0,10)}.xlsx`;
-
-  const disposition = response.headers.get("content-disposition") || "";
-  const filenameMatch = disposition.match(/filename="?([^"]+)"?/i);
-
-  if (filenameMatch && filenameMatch[1]) {
-    filename = filenameMatch[1];
-  }
-
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-
-  setTimeout(function(){
-    URL.revokeObjectURL(url);
-    a.remove();
-  }, 1000);
-
-  log("Audit XLSX berhasil diexport.", {
-    filename,
-    size_bytes: blob.size,
-    models: modelList.length,
-    limit,
-    includeArch,
-    includeAllFields
-  });
-}  document.querySelectorAll(".tab").forEach(btn=>btn.addEventListener("click",()=>{document.querySelectorAll(".tab").forEach(b=>b.classList.remove("active"));btn.classList.add("active");["preview","models","fields","result","log"].forEach(t=>$("tab-"+t).classList.toggle("hidden",t!==btn.dataset.tab));}));
-  $("btnTest").addEventListener("click",()=>testConnection().then(()=>alert("Koneksi berhasil.")).catch(e=>{log("Test koneksi gagal.",e.message);alert(e.message);}));
-  $("btnScanModels").addEventListener("click",()=>scanModels().catch(e=>{log("Scan models gagal.",e.message);alert(e.message);}));
-  $("btnChooseImport").addEventListener("click",()=>$("importFile").click());
-  $("importFile").addEventListener("change",e=>readImportFile(e.target.files[0]).catch(err=>{log("Gagal membaca file.",err.message);alert(err.message);}));
-  $("btnDryRun").addEventListener("click",()=>runImport(true).catch(e=>{log("Dry run gagal.",e.message);alert(e.message);}));
-  $("btnImport").addEventListener("click",()=>{if(confirm("Import akan menulis data ke Odoo. Lanjutkan?"))runImport(false).catch(e=>{log("Import gagal.",e.message);alert(e.message);});});
-  $("btnExportTemplate").addEventListener("click",()=>exportTemplate().catch(e=>{log("Export template gagal.",e.message);alert(e.message);}));
-$("btnAudit").addEventListener("click", function(){
-  exportFullAudit().catch(function(e){
-    log("Audit gagal.", e.message);
-    alert(e.message);
-  });
-});  const drop=$("drop");drop.addEventListener("click",()=>$("importFile").click());drop.addEventListener("dragover",e=>{e.preventDefault();drop.classList.add("drag");});drop.addEventListener("dragleave",()=>drop.classList.remove("drag"));drop.addEventListener("drop",e=>{e.preventDefault();drop.classList.remove("drag");readImportFile(e.dataTransfer.files[0]).catch(err=>{log("Gagal membaca file.",err.message);alert(err.message);});});
-  renderAll();
-})();
+renderPhases();renderStats();renderPhoto();
 </script>
 </body>
 </html>

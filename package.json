@@ -1,16 +1,21 @@
 {
-  "name": "lokalmart-importer-v10-image-import",
-  "version": "10.0.0",
-  "type": "module",
+  "name": "lokalmart-importer-studio",
+  "version": "1.0.3",
   "private": true,
+  "description": "Lokalmart XLSX to Odoo importer with native-like super fast mode and photo queue import.",
   "scripts": {
     "dev": "vercel dev",
-    "deploy": "vercel --prod"
+    "start": "vercel dev",
+    "lint": "node -c api/odoo.js && for f in lib/*.js; do node -c \"$f\"; done"
+  },
+  "dependencies": {
+    "xlsx": "^0.18.5",
+    "xmlrpc": "^1.3.2"
+  },
+  "devDependencies": {
+    "vercel": "^34.0.0"
   },
   "engines": {
     "node": ">=18"
-  },
-  "dependencies": {
-    "xlsx": "^0.18.5"
   }
 }

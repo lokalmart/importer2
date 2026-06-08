@@ -1,35 +1,21 @@
 {
   "version": 2,
   "functions": {
-    "api/audit.js": {
-      "maxDuration": 60
-    },
-    "api/export-profile.js": {
-      "maxDuration": 60
-    },
-    "api/gap-report.js": {
-      "maxDuration": 60
-    },
-    "api/health.js": {
-      "maxDuration": 30
-    },
-    "api/import-images.js": {
-      "maxDuration": 60
-    },
-    "api/import-preview.js": {
-      "maxDuration": 60
-    },
-    "api/import-xlsx.js": {
-      "maxDuration": 60
-    },
-    "api/migration-safe.js": {
-      "maxDuration": 60
-    },
     "api/odoo.js": {
-      "maxDuration": 60
-    },
-    "api/schema-scan.js": {
-      "maxDuration": 60
+      "maxDuration": 60,
+      "memory": 1024
     }
-  }
+  },
+  "rewrites": [
+    { "source": "/", "destination": "/public/index.html" }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "Referrer-Policy", "value": "no-referrer" }
+      ]
+    }
+  ]
 }
